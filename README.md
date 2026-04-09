@@ -96,9 +96,15 @@ PRs welcome — especially for Oracle Fusion, Coupa, and Ariba schemas.
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## Author
+Built by Kundan Sharma — IT & Digital Solution Architect 
+specialising in procurement data transformation and 
+agentic AI in enterprise supply chains.
 
-Built by Kundan Sharma — founder of [DataEsprit](https://dataesprit.com),
-a procurement data intelligence platform. SAP, D365, and JDE specialist.
+15+ years designing and delivering digital transformation 
+programmes across enterprise.
+
+[LinkedIn](https://linkedin.com/in/yourprofile) · 
+[GitHub](https://github.com/kundanshar-cell)
 
 If this saved you time, leave a star.
 
