@@ -2,7 +2,7 @@
 
 const { Command } = require('commander');
 const path = require('path');
-const { generateLFA1, generateEKKO } = require('../src/generators/sap-ecc');
+const { generateLFA1, generateEKKO, generateEKPO } = require('../src/generators/sap-ecc');
 const { toCSV, writeCSV } = require('../src/output/csv');
 const { toJSON, writeJSON } = require('../src/output/json');
 
@@ -33,9 +33,11 @@ program
         data = generateLFA1(rows, { missingRate });
       } else if (options.entity === 'po-headers') {
         data = generateEKKO(rows, { missingRate });
+      } else if (options.entity === 'po-lines') {
+        data = generateEKPO(rows, { missingRate });
       } else {
         console.error(`Entity "${options.entity}" not yet supported for SAP ECC.`);
-        console.error('Supported: vendors, po-headers');
+        console.error('Supported: vendors, po-headers, po-lines');
         process.exit(1);
       }
     } else {
