@@ -2,7 +2,7 @@
 
 const { Command } = require('commander');
 const path = require('path');
-const { generateLFA1, generateEKKO, generateEKPO, generateMKPF, generateMSEG } = require('../src/generators/sap-ecc');
+const { generateLFA1, generateEKKO, generateEKPO, generateMKPF, generateMSEG, generateRBKP, generateRSEG } = require('../src/generators/sap-ecc');
 const { toCSV, writeCSV } = require('../src/output/csv');
 const { toJSON, writeJSON } = require('../src/output/json');
 
@@ -39,9 +39,13 @@ program
         data = generateMKPF(rows, { missingRate });
       } else if (options.entity === 'gr-lines') {
         data = generateMSEG(rows, { missingRate });
+      } else if (options.entity === 'invoice-headers') {
+        data = generateRBKP(rows, { missingRate });
+      } else if (options.entity === 'invoice-lines') {
+        data = generateRSEG(rows, { missingRate });
       } else {
         console.error(`Entity "${options.entity}" not yet supported for SAP ECC.`);
-        console.error('Supported: vendors, po-headers, po-lines, gr-headers, gr-lines');
+        console.error('Supported: vendors, po-headers, po-lines, gr-headers, gr-lines, invoice-headers, invoice-lines');
         process.exit(1);
       }
     } else {
