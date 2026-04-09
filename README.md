@@ -35,7 +35,7 @@ This tool does.
 > **Note:** Package not yet published to npm. Clone and run locally for now.
 
 ```bash
-git clone https://github.com/your-username/erp-datagen.git
+git clone https://github.com/kundanshar-cell/erp-datagen.git
 cd erp-datagen
 npm install
 ```
