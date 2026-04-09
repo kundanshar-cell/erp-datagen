@@ -102,7 +102,7 @@ agentic AI in enterprise supply chains.
 
 15+ years designing and delivering digital transformation 
 programmes across enterprise.
-[GitHub](https://github.com/kundanshar-cell/erp-datagen.git)
+[GitHub](https://github.com/kundanshar-cell)
 
 If this saved you time, leave a star.
 
