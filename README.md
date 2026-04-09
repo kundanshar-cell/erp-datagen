@@ -1,6 +1,7 @@
 # erp-datagen
 
 ![Status](https://img.shields.io/badge/status-working-green)
+![npm](https://img.shields.io/npm/v/erp-datagen)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen)
 
@@ -34,7 +35,13 @@ All three ERPs support a `full-p2p` scenario that generates all tables
 
 ## Install
 
-> **Note:** Package not yet published to npm. Clone and run locally for now.
+```bash
+npx erp-datagen --help
+# or install globally
+npm install -g erp-datagen
+```
+
+Or clone and run locally:
 
 ```bash
 git clone https://github.com/kundanshar-cell/erp-datagen.git
@@ -47,7 +54,7 @@ npm install
 ### Generate a single entity
 
 ```bash
-node bin/cli.js generate --erp=<erp> --entity=<entity> [options]
+npx erp-datagen generate --erp=<erp> --entity=<entity> [options]
 ```
 
 | Option | Description | Default |
@@ -63,16 +70,16 @@ node bin/cli.js generate --erp=<erp> --entity=<entity> [options]
 
 ```bash
 # SAP ECC — 500 vendors as CSV
-node bin/cli.js generate --erp=sap-ecc --entity=vendors --rows=500 --output=csv
+npx erp-datagen generate --erp=sap-ecc --entity=vendors --rows=500 --output=csv
 
 # SAP ECC — 200 PO headers as JSON, written to file
-node bin/cli.js generate --erp=sap-ecc --entity=po-headers --rows=200 --output=json --file=./ekko.json
+npx erp-datagen generate --erp=sap-ecc --entity=po-headers --rows=200 --output=json --file=./ekko.json
 
 # JDE — 100 PO lines with 20% missing fields (simulates messy data)
-node bin/cli.js generate --erp=jde --entity=po-lines --rows=100 --missing-rate=0.2
+npx erp-datagen generate --erp=jde --entity=po-lines --rows=100 --missing-rate=0.2
 
 # D365 — 300 invoice headers as CSV
-node bin/cli.js generate --erp=d365 --entity=invoice-headers --rows=300 --output=csv
+npx erp-datagen generate --erp=d365 --entity=invoice-headers --rows=300 --output=csv
 ```
 
 ### Supported entities per ERP
@@ -104,7 +111,7 @@ Generates all tables for an ERP linked by real document keys — vendors → PO 
 PO lines → goods receipt → invoices. One file per table, written to an output directory.
 
 ```bash
-node bin/cli.js scenario --erp=<erp> --name=full-p2p [options]
+npx erp-datagen scenario --erp=<erp> --name=full-p2p [options]
 ```
 
 | Option | Description | Default |
@@ -120,13 +127,13 @@ node bin/cli.js scenario --erp=<erp> --name=full-p2p [options]
 
 ```bash
 # SAP ECC — full P2P dataset, 1000 PO lines, CSV
-node bin/cli.js scenario --erp=sap-ecc --name=full-p2p --rows=1000 --output-dir=./output
+npx erp-datagen scenario --erp=sap-ecc --name=full-p2p --rows=1000 --output-dir=./output
 
 # JDE — full P2P as JSON
-node bin/cli.js scenario --erp=jde --name=full-p2p --rows=500 --output=json --output-dir=./output/jde
+npx erp-datagen scenario --erp=jde --name=full-p2p --rows=500 --output=json --output-dir=./output/jde
 
 # D365 — messy data with 30% missing fields
-node bin/cli.js scenario --erp=d365 --name=full-p2p --rows=1000 --missing-rate=0.3 --output-dir=./output/d365
+npx erp-datagen scenario --erp=d365 --name=full-p2p --rows=1000 --missing-rate=0.3 --output-dir=./output/d365
 ```
 
 **Sample output (SAP ECC, 1000 rows):**
@@ -163,7 +170,7 @@ RSEG_invoice_lines.csv  (567 rows)
 
 ## Roadmap
 
-- [ ] Publish to npm
+- [x] Publish to npm
 - [ ] SQL and Parquet output formats
 - [ ] Oracle Fusion Procurement
 - [ ] Coupa supplier/PO entities
