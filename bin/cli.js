@@ -5,8 +5,10 @@ const fs = require('fs');
 const path = require('path');
 const { generateLFA1, generateEKKO, generateEKPO, generateMKPF, generateMSEG, generateRBKP, generateRSEG } = require('../src/generators/sap-ecc');
 const { generateF0101, generateF4301, generateF4311, generateF43121, generateF0411 } = require('../src/generators/jde');
+const { generateVendTable, generatePurchTable, generatePurchLine, generateVendPackingSlipJour, generateVendInvoiceJour, generateVendInvoiceTrans } = require('../src/generators/d365');
 const { runFullP2P } = require('../src/scenarios/sap-ecc-full-p2p');
 const { runJdeFullP2P } = require('../src/scenarios/jde-full-p2p');
+const { runD365FullP2P } = require('../src/scenarios/d365-full-p2p');
 const { toCSV, writeCSV } = require('../src/output/csv');
 const { toJSON, writeJSON } = require('../src/output/json');
 
@@ -56,8 +58,20 @@ program
         console.error('Supported: vendors, po-headers, po-lines, gr-lines, invoices');
         process.exit(1);
       }
+    } else if (options.erp === 'd365') {
+      if (options.entity === 'vendors')          data = generateVendTable(rows, { missingRate });
+      else if (options.entity === 'po-headers')  data = generatePurchTable(rows, { missingRate });
+      else if (options.entity === 'po-lines')    data = generatePurchLine(rows, { missingRate });
+      else if (options.entity === 'gr-headers')  data = generateVendPackingSlipJour(rows, { missingRate });
+      else if (options.entity === 'invoice-headers') data = generateVendInvoiceJour(rows, { missingRate });
+      else if (options.entity === 'invoice-lines')   data = generateVendInvoiceTrans(rows, { missingRate });
+      else {
+        console.error(`Entity "${options.entity}" not supported for D365.`);
+        console.error('Supported: vendors, po-headers, po-lines, gr-headers, invoice-headers, invoice-lines');
+        process.exit(1);
+      }
     } else {
-      console.error(`ERP "${options.erp}" not yet supported. Supported: sap-ecc, jde`);
+      console.error(`ERP "${options.erp}" not yet supported. Supported: sap-ecc, jde, d365`);
       process.exit(1);
     }
 
@@ -81,8 +95,8 @@ program
 
     if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 
-    if (!['sap-ecc', 'jde'].includes(options.erp)) {
-      console.error(`ERP "${options.erp}" not yet supported for scenarios. Supported: sap-ecc, jde`);
+    if (!['sap-ecc', 'jde', 'd365'].includes(options.erp)) {
+      console.error(`ERP "${options.erp}" not yet supported for scenarios. Supported: sap-ecc, jde, d365`);
       process.exit(1);
     }
 
@@ -105,7 +119,7 @@ program
         { name: 'RBKP_invoice_headers',  data: result.rbkp  },
         { name: 'RSEG_invoice_lines',    data: result.rseg  },
       ];
-    } else {
+    } else if (options.erp === 'jde') {
       console.log(`Generating JDE E1 full P2P dataset (~${rows} PO lines)...\n`);
       result = runJdeFullP2P(rows, { missingRate });
       tables = [
@@ -114,6 +128,17 @@ program
         { name: 'F4311_po_lines',   data: result.f4311  },
         { name: 'F43121_gr_lines',  data: result.f43121 },
         { name: 'F0411_invoices',   data: result.f0411  },
+      ];
+    } else {
+      console.log(`Generating D365 F&O full P2P dataset (~${rows} PO lines)...\n`);
+      result = runD365FullP2P(rows, { missingRate });
+      tables = [
+        { name: 'VendTable',              data: result.vendTable       },
+        { name: 'PurchTable',             data: result.purchTable      },
+        { name: 'PurchLine',              data: result.purchLine       },
+        { name: 'VendPackingSlipJour',    data: result.packingSlipJour },
+        { name: 'VendInvoiceJour',        data: result.invoiceJour     },
+        { name: 'VendInvoiceTrans',       data: result.invoiceTrans    },
       ];
     }
 
