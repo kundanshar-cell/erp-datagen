@@ -4,6 +4,7 @@ const { Command } = require('commander');
 const fs = require('fs');
 const path = require('path');
 const { generateLFA1, generateEKKO, generateEKPO, generateMKPF, generateMSEG, generateRBKP, generateRSEG } = require('../src/generators/sap-ecc');
+const { generateF0101, generateF4301, generateF4311, generateF43121, generateF0411 } = require('../src/generators/jde');
 const { runFullP2P } = require('../src/scenarios/sap-ecc-full-p2p');
 const { toCSV, writeCSV } = require('../src/output/csv');
 const { toJSON, writeJSON } = require('../src/output/json');
@@ -43,8 +44,19 @@ program
         console.error('Supported: vendors, po-headers, po-lines, gr-headers, gr-lines, invoice-headers, invoice-lines');
         process.exit(1);
       }
+    } else if (options.erp === 'jde') {
+      if (options.entity === 'vendors')          data = generateF0101(rows, { missingRate });
+      else if (options.entity === 'po-headers')  data = generateF4301(rows, { missingRate });
+      else if (options.entity === 'po-lines')    data = generateF4311(rows, { missingRate });
+      else if (options.entity === 'gr-lines')    data = generateF43121(rows, { missingRate });
+      else if (options.entity === 'invoices')    data = generateF0411(rows, { missingRate });
+      else {
+        console.error(`Entity "${options.entity}" not supported for JDE.`);
+        console.error('Supported: vendors, po-headers, po-lines, gr-lines, invoices');
+        process.exit(1);
+      }
     } else {
-      console.error(`ERP "${options.erp}" not yet supported. Supported: sap-ecc`);
+      console.error(`ERP "${options.erp}" not yet supported. Supported: sap-ecc, jde`);
       process.exit(1);
     }
 
