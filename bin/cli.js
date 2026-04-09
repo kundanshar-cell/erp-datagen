@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 
 const { Command } = require('commander');
+const fs = require('fs');
 const path = require('path');
 const { generateLFA1, generateEKKO, generateEKPO, generateMKPF, generateMSEG, generateRBKP, generateRSEG } = require('../src/generators/sap-ecc');
+const { runFullP2P } = require('../src/scenarios/sap-ecc-full-p2p');
 const { toCSV, writeCSV } = require('../src/output/csv');
 const { toJSON, writeJSON } = require('../src/output/json');
 
@@ -13,11 +15,12 @@ program
   .description('Generate realistic synthetic procurement data for SAP ECC, D365, and JDE')
   .version('0.1.0');
 
+// ── generate: single entity ──────────────────────────────────────────────────
 program
   .command('generate')
-  .description('Generate synthetic ERP data')
+  .description('Generate a single ERP entity')
   .requiredOption('--erp <system>', 'ERP system: sap-ecc | d365 | jde')
-  .requiredOption('--entity <name>', 'Entity to generate: vendors | ...')
+  .requiredOption('--entity <name>', 'Entity: vendors | po-headers | po-lines | gr-headers | gr-lines | invoice-headers | invoice-lines')
   .option('--rows <number>', 'Number of rows to generate', '100')
   .option('--output <format>', 'Output format: csv | json', 'csv')
   .option('--file <path>', 'Output file path (defaults to stdout)')
@@ -25,54 +28,95 @@ program
   .action((options) => {
     const rows = parseInt(options.rows, 10);
     const missingRate = parseFloat(options.missingRate);
-
     let data;
 
     if (options.erp === 'sap-ecc') {
-      if (options.entity === 'vendors') {
-        data = generateLFA1(rows, { missingRate });
-      } else if (options.entity === 'po-headers') {
-        data = generateEKKO(rows, { missingRate });
-      } else if (options.entity === 'po-lines') {
-        data = generateEKPO(rows, { missingRate });
-      } else if (options.entity === 'gr-headers') {
-        data = generateMKPF(rows, { missingRate });
-      } else if (options.entity === 'gr-lines') {
-        data = generateMSEG(rows, { missingRate });
-      } else if (options.entity === 'invoice-headers') {
-        data = generateRBKP(rows, { missingRate });
-      } else if (options.entity === 'invoice-lines') {
-        data = generateRSEG(rows, { missingRate });
-      } else {
-        console.error(`Entity "${options.entity}" not yet supported for SAP ECC.`);
+      if (options.entity === 'vendors')          data = generateLFA1(rows, { missingRate });
+      else if (options.entity === 'po-headers')  data = generateEKKO(rows, { missingRate });
+      else if (options.entity === 'po-lines')    data = generateEKPO(rows, { missingRate });
+      else if (options.entity === 'gr-headers')  data = generateMKPF(rows, { missingRate });
+      else if (options.entity === 'gr-lines')    data = generateMSEG(rows, { missingRate });
+      else if (options.entity === 'invoice-headers') data = generateRBKP(rows, { missingRate });
+      else if (options.entity === 'invoice-lines')   data = generateRSEG(rows, { missingRate });
+      else {
+        console.error(`Entity "${options.entity}" not supported for SAP ECC.`);
         console.error('Supported: vendors, po-headers, po-lines, gr-headers, gr-lines, invoice-headers, invoice-lines');
         process.exit(1);
       }
     } else {
-      console.error(`ERP "${options.erp}" not yet supported.`);
-      console.error('Supported: sap-ecc');
+      console.error(`ERP "${options.erp}" not yet supported. Supported: sap-ecc`);
       process.exit(1);
     }
 
-    if (options.output === 'csv') {
-      if (options.file) {
-        writeCSV(data, options.file);
-        console.log(`Written ${rows} rows to ${options.file}`);
-      } else {
-        console.log(toCSV(data));
-      }
-    } else if (options.output === 'json') {
-      if (options.file) {
-        writeJSON(data, options.file);
-        console.log(`Written ${rows} rows to ${options.file}`);
-      } else {
-        console.log(toJSON(data));
-      }
-    } else {
-      console.error(`Output format "${options.output}" not yet supported.`);
-      console.error('Supported: csv, json');
+    writeOutput(data, options.output, options.file, rows);
+  });
+
+// ── scenario: full linked dataset ────────────────────────────────────────────
+program
+  .command('scenario')
+  .description('Generate a full linked dataset across all tables')
+  .requiredOption('--erp <system>', 'ERP system: sap-ecc')
+  .requiredOption('--name <scenario>', 'Scenario name: full-p2p')
+  .option('--rows <number>', 'Approximate number of PO lines to generate', '100')
+  .option('--output <format>', 'Output format: csv | json', 'csv')
+  .option('--output-dir <dir>', 'Directory to write output files', './output')
+  .option('--missing-rate <rate>', 'Rate of missing optional fields (0-1)', '0')
+  .action((options) => {
+    const rows = parseInt(options.rows, 10);
+    const missingRate = parseFloat(options.missingRate);
+    const outputDir = path.resolve(options.outputDir);
+
+    if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+
+    if (options.erp !== 'sap-ecc') {
+      console.error(`ERP "${options.erp}" not yet supported for scenarios. Supported: sap-ecc`);
       process.exit(1);
     }
+
+    if (options.name !== 'full-p2p') {
+      console.error(`Scenario "${options.name}" not supported. Supported: full-p2p`);
+      process.exit(1);
+    }
+
+    console.log(`Generating SAP ECC full P2P dataset (~${rows} PO lines)...\n`);
+    const result = runFullP2P(rows, { missingRate });
+
+    const tables = [
+      { name: 'LFA1_vendors',          data: result.lfa1  },
+      { name: 'EKKO_po_headers',       data: result.ekko  },
+      { name: 'EKPO_po_lines',         data: result.ekpo  },
+      { name: 'MKPF_gr_headers',       data: result.mkpf  },
+      { name: 'MSEG_gr_lines',         data: result.mseg  },
+      { name: 'RBKP_invoice_headers',  data: result.rbkp  },
+      { name: 'RSEG_invoice_lines',    data: result.rseg  },
+    ];
+
+    for (const table of tables) {
+      const ext = options.output === 'json' ? 'json' : 'csv';
+      const filePath = path.join(outputDir, `${table.name}.${ext}`);
+      if (options.output === 'json') {
+        writeJSON(table.data, filePath);
+      } else {
+        writeCSV(table.data, filePath);
+      }
+      console.log(`  ${table.name}.${ext}  (${table.data.length} rows)`);
+    }
+
+    console.log(`\nDone. Files written to: ${outputDir}`);
   });
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+function writeOutput(data, format, filePath, rows) {
+  if (format === 'csv') {
+    if (filePath) { writeCSV(data, filePath); console.log(`Written ${rows} rows to ${filePath}`); }
+    else console.log(toCSV(data));
+  } else if (format === 'json') {
+    if (filePath) { writeJSON(data, filePath); console.log(`Written ${rows} rows to ${filePath}`); }
+    else console.log(toJSON(data));
+  } else {
+    console.error(`Output format "${format}" not supported. Supported: csv, json`);
+    process.exit(1);
+  }
+}
 
 program.parse(process.argv);
