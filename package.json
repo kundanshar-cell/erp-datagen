@@ -1,0 +1,28 @@
+{
+  "name": "erp-datagen",
+  "version": "0.1.0",
+  "description": "Generate realistic synthetic procurement data for SAP ECC, D365, and JDE — for testing, AI training, and demos",
+  "main": "src/index.js",
+  "bin": {
+    "erp-datagen": "./bin/cli.js"
+  },
+  "scripts": {
+    "start": "node bin/cli.js"
+  },
+  "keywords": [
+    "sap",
+    "erp",
+    "procurement",
+    "synthetic-data",
+    "jde",
+    "d365",
+    "test-data",
+    "ai-training"
+  ],
+  "author": "Kundan Sharma",
+  "license": "MIT",
+  "dependencies": {
+    "@faker-js/faker": "^10.4.0",
+    "commander": "^14.0.3"
+  }
+}
