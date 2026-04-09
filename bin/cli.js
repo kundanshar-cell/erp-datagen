@@ -6,6 +6,7 @@ const path = require('path');
 const { generateLFA1, generateEKKO, generateEKPO, generateMKPF, generateMSEG, generateRBKP, generateRSEG } = require('../src/generators/sap-ecc');
 const { generateF0101, generateF4301, generateF4311, generateF43121, generateF0411 } = require('../src/generators/jde');
 const { runFullP2P } = require('../src/scenarios/sap-ecc-full-p2p');
+const { runJdeFullP2P } = require('../src/scenarios/jde-full-p2p');
 const { toCSV, writeCSV } = require('../src/output/csv');
 const { toJSON, writeJSON } = require('../src/output/json');
 
@@ -80,8 +81,8 @@ program
 
     if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 
-    if (options.erp !== 'sap-ecc') {
-      console.error(`ERP "${options.erp}" not yet supported for scenarios. Supported: sap-ecc`);
+    if (!['sap-ecc', 'jde'].includes(options.erp)) {
+      console.error(`ERP "${options.erp}" not yet supported for scenarios. Supported: sap-ecc, jde`);
       process.exit(1);
     }
 
@@ -90,18 +91,31 @@ program
       process.exit(1);
     }
 
-    console.log(`Generating SAP ECC full P2P dataset (~${rows} PO lines)...\n`);
-    const result = runFullP2P(rows, { missingRate });
+    let result, tables;
 
-    const tables = [
-      { name: 'LFA1_vendors',          data: result.lfa1  },
-      { name: 'EKKO_po_headers',       data: result.ekko  },
-      { name: 'EKPO_po_lines',         data: result.ekpo  },
-      { name: 'MKPF_gr_headers',       data: result.mkpf  },
-      { name: 'MSEG_gr_lines',         data: result.mseg  },
-      { name: 'RBKP_invoice_headers',  data: result.rbkp  },
-      { name: 'RSEG_invoice_lines',    data: result.rseg  },
-    ];
+    if (options.erp === 'sap-ecc') {
+      console.log(`Generating SAP ECC full P2P dataset (~${rows} PO lines)...\n`);
+      result = runFullP2P(rows, { missingRate });
+      tables = [
+        { name: 'LFA1_vendors',          data: result.lfa1  },
+        { name: 'EKKO_po_headers',       data: result.ekko  },
+        { name: 'EKPO_po_lines',         data: result.ekpo  },
+        { name: 'MKPF_gr_headers',       data: result.mkpf  },
+        { name: 'MSEG_gr_lines',         data: result.mseg  },
+        { name: 'RBKP_invoice_headers',  data: result.rbkp  },
+        { name: 'RSEG_invoice_lines',    data: result.rseg  },
+      ];
+    } else {
+      console.log(`Generating JDE E1 full P2P dataset (~${rows} PO lines)...\n`);
+      result = runJdeFullP2P(rows, { missingRate });
+      tables = [
+        { name: 'F0101_vendors',    data: result.f0101  },
+        { name: 'F4301_po_headers', data: result.f4301  },
+        { name: 'F4311_po_lines',   data: result.f4311  },
+        { name: 'F43121_gr_lines',  data: result.f43121 },
+        { name: 'F0411_invoices',   data: result.f0411  },
+      ];
+    }
 
     for (const table of tables) {
       const ext = options.output === 'json' ? 'json' : 'csv';
