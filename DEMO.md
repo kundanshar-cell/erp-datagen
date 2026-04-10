@@ -29,18 +29,21 @@ Generates all tables linked by real document keys — vendor → PO → GR → I
 npx erp-datagen scenario --erp=sap-ecc --name=full-p2p --rows=1000 --output-dir=./demo-output
 ```
 
-Output:
-```
-LFA1_vendors.csv          (~100 rows)
-EKKO_po_headers.csv       (~200 rows)
-EKPO_po_lines.csv         (~600 rows)
-MKPF_gr_headers.csv       (~200 rows)
-MSEG_gr_lines.csv         (~500 rows)
-RBKP_invoice_headers.csv  (~150 rows)
-RSEG_invoice_lines.csv    (~560 rows)
-```
+**Understanding `--rows`:** The number refers to approximate PO lines — not 1000 of every table.
+The tool generates realistic proportions, just like a real ERP:
+
+| File | ~Rows | Why |
+|------|-------|-----|
+| `LFA1_vendors.csv` | ~100 | 1 vendor supplies multiple POs |
+| `EKKO_po_headers.csv` | ~200 | 1 PO header covers multiple lines |
+| `EKPO_po_lines.csv` | ~1000 | Your anchor number |
+| `MKPF_gr_headers.csv` | ~200 | Mirrors PO headers roughly |
+| `MSEG_gr_lines.csv` | ~500 | Not all PO lines get a GR (partial deliveries) |
+| `RBKP_invoice_headers.csv` | ~150 | GRs consolidated into fewer invoices |
+| `RSEG_invoice_lines.csv` | ~560 | Matches invoiced items |
 
 Every file links correctly — a PO line references a real PO header, which references a real vendor.
+This is a real procurement story in numbers, not flat test data.
 
 ---
 
