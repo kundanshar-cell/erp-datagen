@@ -46,9 +46,18 @@ function runJdeFullP2P(rows, options = {}) {
     ITM:  l.ITM,
     LITM: l.LITM,
     UOM:  l.UOM,
+    UORG: l.UORG,                                            // Ordered qty — GR receipt derives from this
     PRRC: l.PRRC,
+    AEXP: l.AEXP,                                            // Extended price — invoice amount derives from this
     CRCD: l.CRCD,
   }));
+
+  // Compute PO total amounts for realistic invoice amounts in F0411
+  const poTotalAmountMap = {};
+  f4311.forEach(l => {
+    if (!poTotalAmountMap[l.DOCO]) poTotalAmountMap[l.DOCO] = 0;
+    poTotalAmountMap[l.DOCO] = parseFloat((poTotalAmountMap[l.DOCO] + l.AEXP).toFixed(2));
+  });
 
   // --- Step 4: GR Lines (F43121) linked to F4311 ---
   // Roughly one receipt per 3 PO lines (partial deliveries common)
@@ -61,6 +70,7 @@ function runJdeFullP2P(rows, options = {}) {
     missingRate,
     vendorPool,
     poPool: f4301,
+    poTotalAmountMap,                                        // PO total amounts for realistic invoice amounts
   });
 
   return { f0101, f4301, f4311, f43121, f0411 };

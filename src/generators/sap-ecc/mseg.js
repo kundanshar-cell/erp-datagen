@@ -26,7 +26,7 @@ function generateMSEGRow(lineIndex, mblnr, mjahr, options = {}) {
     Math.random() < missingRate ? '' : value;
 
   // Pick a PO line to receive against, or generate standalone
-  let ebeln, ebelp, matnr, meins, waers, werks, unitPrice;
+  let ebeln, ebelp, matnr, meins, waers, werks, unitPrice, poOrderedQty;
   if (poPool.length > 0) {
     const poLine = faker.helpers.arrayElement(poPool);
     ebeln = poLine.EBELN;
@@ -36,6 +36,7 @@ function generateMSEGRow(lineIndex, mblnr, mjahr, options = {}) {
     waers = poLine.WAERS;
     werks = poLine.WERKS;
     unitPrice = poLine.NETPR;
+    poOrderedQty = poLine.MENGE;                               // Ordered qty from PO line
   } else {
     ebeln = String(4500000000 + faker.number.int({ min: 0, max: 99999 })).padStart(10, '0');
     ebelp = String((faker.number.int({ min: 1, max: 20 })) * 10).padStart(5, '0');
@@ -44,11 +45,12 @@ function generateMSEGRow(lineIndex, mblnr, mjahr, options = {}) {
     waers = faker.helpers.arrayElement(['GBP', 'USD', 'EUR', 'INR']);
     werks = faker.helpers.arrayElement(PLANT_CODES);
     unitPrice = faker.number.float({ min: 1, max: 50000, fractionDigits: 2 });
+    poOrderedQty = faker.number.float({ min: 1, max: 500, fractionDigits: 3 });
   }
 
-  // Partial deliveries are common — receive between 20% and 100% of expected qty
-  const orderedQty = faker.number.float({ min: 1, max: 500, fractionDigits: 3 });
-  const receivedQty = parseFloat((orderedQty * faker.number.float({ min: 0.2, max: 1.0, fractionDigits: 2 })).toFixed(3));
+  // Partial deliveries — receive 60–100% of PO ordered qty (realistic; 20% min was too low)
+  const orderedQty = poOrderedQty;
+  const receivedQty = parseFloat((orderedQty * faker.number.float({ min: 0.6, max: 1.0, fractionDigits: 2 })).toFixed(3));
   const amount = parseFloat((receivedQty * unitPrice).toFixed(2));
 
   // 5% chance of reversal movement type

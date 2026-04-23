@@ -15,7 +15,7 @@ function generateF43121Row(index, options = {}) {
   const maybeBlank = (value) =>
     Math.random() < missingRate ? '' : value;
 
-  let pdoc, pdct, kcoo, plin, itm, litm, uom, prrc, crcd;
+  let pdoc, pdct, kcoo, plin, itm, litm, uom, prrc, crcd, poOrderedQty;
 
   if (poLinePool.length > 0) {
     const line = faker.helpers.arrayElement(poLinePool);
@@ -28,6 +28,7 @@ function generateF43121Row(index, options = {}) {
     uom   = line.UOM;
     prrc  = line.PRRC;
     crcd  = line.CRCD;
+    poOrderedQty = line.UORG;                                // Ordered qty — receipt derives from this
   } else {
     pdoc  = 100000 + faker.number.int({ min: 0, max: 9999 });
     pdct  = faker.helpers.arrayElement(RECEIPT_TYPES);
@@ -38,12 +39,13 @@ function generateF43121Row(index, options = {}) {
     uom   = faker.helpers.arrayElement(UNITS_OF_MEASURE);
     prrc  = faker.number.float({ min: 1, max: 50000, fractionDigits: 4 });
     crcd  = faker.helpers.arrayElement(['GBP', 'USD', 'EUR', 'INR']);
+    poOrderedQty = faker.number.float({ min: 1, max: 500, fractionDigits: 2 });
   }
 
   const receiptDate = faker.date.between({ from: '2022-01-01', to: '2025-12-31' });
 
-  // Partial receipts — receive 20-100% of expected
-  const urec = faker.number.float({ min: 1, max: 500, fractionDigits: 2 });
+  // Partial receipts — receive 60–100% of PO ordered qty
+  const urec = parseFloat((poOrderedQty * faker.number.float({ min: 0.6, max: 1.0, fractionDigits: 2 })).toFixed(2));
   const aexp = parseFloat((urec * (prrc || 1)).toFixed(2));
 
   // 4% reversals

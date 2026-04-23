@@ -12,10 +12,22 @@ const PAYMENT_TERMS = ['N30', 'N60', 'N90', 'NET', '2/10'];
 const PAY_INSTRUMENTS = ['C', 'W', 'D', 'E'];   // Check, Wire, Direct debit, Electronic
 const PAY_STATUSES = ['', 'A', 'P', 'D', '#'];  // Open, Approved, Paid, Draft, Dispute
 
+function applyInvoiceVariance(baseAmount) {
+  const r = Math.random();
+  if (r < 0.90) {
+    return parseFloat((baseAmount * (1 + (Math.random() * 0.01 - 0.005))).toFixed(2));
+  } else if (r < 0.97) {
+    return parseFloat((baseAmount * (1 + (Math.random() * 0.04 - 0.02))).toFixed(2));
+  } else {
+    return parseFloat((baseAmount * (1 + (Math.random() * 0.30 - 0.15))).toFixed(2));
+  }
+}
+
 function generateF0411Row(index, options = {}) {
   const missingRate = options.missingRate || 0;
   const vendorPool = options.vendorPool || [];
   const poPool = options.poPool || [];
+  const poTotalAmountMap = options.poTotalAmountMap || {};
 
   const maybeBlank = (value) =>
     Math.random() < missingRate ? '' : value;
@@ -33,7 +45,11 @@ function generateF0411Row(index, options = {}) {
     : 100000 + faker.number.int({ min: 0, max: 9999 });
 
   const crcd = faker.helpers.arrayElement(CURRENCIES);
-  const baseAmount = faker.number.float({ min: 100, max: 500000, fractionDigits: 2 });
+  // Derive invoice amount from PO total if available, otherwise fallback to random
+  const poTotal = poTotalAmountMap[pdoc];
+  const baseAmount = poTotal
+    ? applyInvoiceVariance(poTotal)
+    : faker.number.float({ min: 100, max: 500000, fractionDigits: 2 });
   const taxRate = faker.helpers.arrayElement([0, 0.05, 0.10, 0.20]);
   const taxAmount = parseFloat((baseAmount * taxRate).toFixed(2));
   const grossAmount = parseFloat((baseAmount + taxAmount).toFixed(2));

@@ -47,6 +47,7 @@ function runD365FullP2P(rows, options = {}) {
     ItemId:     l.ItemId,
     PurchUnit:  l.PurchUnit,
     PurchPrice: l.PurchPrice,
+    PurchQty:   l.PurchQty,                                  // Ordered qty — invoice qty derives from this
   }));
 
   // --- Step 4: GR Headers (VendPackingSlipJour) linked to PurchTable ---

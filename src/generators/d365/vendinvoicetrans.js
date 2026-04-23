@@ -15,15 +15,38 @@ function generateVendInvoiceTransRow(lineIndex, ledgerVoucher, dataAreaId, purch
   const maybeBlank = (value) =>
     Math.random() < missingRate ? '' : value;
 
-  const invoicedQty = faker.number.float({ min: 1, max: 500, fractionDigits: 2 });
-  const unitPrice = faker.number.float({ min: 1, max: 50000, fractionDigits: 2 });
-  const lineAmount = parseFloat((invoicedQty * unitPrice).toFixed(2));
+  // Invoice qty and price must derive from PO line values (passed via poLine in the caller)
+  // poLine fields expected: PurchPrice, PurchQty (injected by caller below)
+  const poPurchPrice = options._poLine ? options._poLine.PurchPrice : faker.number.float({ min: 1, max: 50000, fractionDigits: 2 });
+  const poPurchQty   = options._poLine ? options._poLine.PurchQty   : faker.number.float({ min: 1, max: 500, fractionDigits: 2 });
 
-  // Price variance on 10% of lines — invoice vs PO price mismatch
-  const hasVariance = Math.random() < 0.10;
-  const actualAmount = hasVariance
-    ? parseFloat((lineAmount * faker.number.float({ min: 0.90, max: 1.10, fractionDigits: 4 })).toFixed(2))
-    : lineAmount;
+  // Invoice qty: 80% full (95–100% of PO qty), 20% partial (50–95%)
+  const isPartialInvoice = Math.random() < 0.20;
+  const invoicedQty = parseFloat((poPurchQty * faker.number.float({
+    min: isPartialInvoice ? 0.50 : 0.95,
+    max: isPartialInvoice ? 0.95 : 1.00,
+    fractionDigits: 2,
+  })).toFixed(2));
+
+  // Invoice unit price derived from PO price:
+  //   90%: exact match (within ±0.5%)
+  //    7%: small variance ±2%
+  //    3%: outlier ±15%
+  const varianceRoll = Math.random();
+  let unitPrice, hasVariance;
+  if (varianceRoll < 0.90) {
+    unitPrice = parseFloat((poPurchPrice * (1 + (Math.random() * 0.01 - 0.005))).toFixed(2));
+    hasVariance = false;
+  } else if (varianceRoll < 0.97) {
+    unitPrice = parseFloat((poPurchPrice * (1 + (Math.random() * 0.04 - 0.02))).toFixed(2));
+    hasVariance = true;
+  } else {
+    unitPrice = parseFloat((poPurchPrice * (1 + (Math.random() * 0.30 - 0.15))).toFixed(2));
+    hasVariance = true;
+  }
+
+  const lineAmount = parseFloat((invoicedQty * unitPrice).toFixed(2));
+  const actualAmount = lineAmount;
 
   return {
     LedgerVoucher:       ledgerVoucher,                         // Links to VendInvoiceJour
@@ -69,7 +92,7 @@ function generateVendInvoiceTrans(rows, options = {}) {
           poLine ? poLine.PurchId : inv.PurchId,
           poLine ? poLine.LineNumber : faker.number.int({ min: 1, max: 10 }),
           inv.InvoiceCurrencyCode,
-          options
+          { ...options, _poLine: poLine }            // Inject PO line price/qty for this row
         ));
       }
     }
