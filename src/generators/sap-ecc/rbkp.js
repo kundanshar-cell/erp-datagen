@@ -5,7 +5,7 @@ const { seasonalDate, invoicePostingDate } = require('../../utils/dates');
 // One RBKP per vendor invoice posted in MIRO/MIR7
 
 const DOCUMENT_TYPES = ['RE', 'KR', 'RD'];   // Invoice, Vendor credit memo, Invoice with diff
-const COMPANY_CODES = ['1000', '2000', '3000', 'GB01', 'US01', 'IN01'];
+const DEFAULT_COMPANY_CODES = ['1000', '2000', '3000', 'GB01', 'US01', 'IN01'];
 const CURRENCIES = ['GBP', 'USD', 'EUR', 'INR', 'SGD', 'JPY'];
 const PAYMENT_TERMS = ['NT30', 'NT60', 'NT90', '0001', '0002', 'Z030'];
 const INVOICE_STATUSES = ['', 'A', 'B', 'Z'];  // Open, Parked, Posted, Reversed
@@ -21,6 +21,9 @@ function padBelnr(num) {
 function generateRBKPRow(index, options = {}) {
   const missingRate = options.missingRate || 0;
   const vendorPool = options.vendorPool || [];
+  const companyCodes = (options.companyCodePool && options.companyCodePool.length > 0)
+    ? options.companyCodePool
+    : DEFAULT_COMPANY_CODES;
 
   const maybeBlank = (value) =>
     Math.random() < missingRate ? '' : value;
@@ -43,7 +46,7 @@ function generateRBKPRow(index, options = {}) {
   return {
     BELNR: padBelnr(5100000000 + index),
     GJAHR: String(invoiceDate.getFullYear()),
-    BUKRS: faker.helpers.arrayElement(COMPANY_CODES),
+    BUKRS: faker.helpers.arrayElement(companyCodes),
     BLART: faker.helpers.arrayElement(DOCUMENT_TYPES),
     LIFNR: lifnr,
     BLDAT: sapDate(invoiceDate),                           // Invoice date

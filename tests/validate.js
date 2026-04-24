@@ -661,10 +661,106 @@ test('SAP scenario: vendor master has PAYMENT_BEHAVIOR on all rows', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  SECTION 7: CLI smoke tests
+//  SECTION 7: Org hierarchy & commodity realism (P7 + P8)
 // ═══════════════════════════════════════════════════════════════════════════
 
-section('7. CLI smoke tests');
+const { SAP_ORG, JDE_ORG } = require('../src/utils/org-hierarchy');
+const { CATALOGUE } = require('../src/utils/commodity');
+
+section('7. Org hierarchy and commodity realism');
+
+test('SAP: every EKPO.WERKS belongs to its EKKO.BUKRS plant list', () => {
+  const result = runFullP2P(200);
+  const poCompanyMap = {};
+  result.ekko.forEach(h => { poCompanyMap[h.EBELN] = h.BUKRS; });
+
+  let violations = 0;
+  result.ekpo.forEach(line => {
+    const bukrs = poCompanyMap[line.EBELN];
+    if (!bukrs) return;
+    const org = SAP_ORG[bukrs];
+    if (!org) return;
+    if (!org.plants.includes(line.WERKS)) violations++;
+  });
+  assert.equal(violations, 0, `${violations} EKPO lines have WERKS outside their company's plant list`);
+});
+
+test('SAP: every EKKO.EKORG belongs to its BUKRS purchasing org list', () => {
+  const result = runFullP2P(100);
+  let violations = 0;
+  result.ekko.forEach(h => {
+    const org = SAP_ORG[h.BUKRS];
+    if (!org) return;
+    if (!org.porg.includes(h.EKORG)) violations++;
+  });
+  assert.equal(violations, 0, `${violations} EKKO rows have EKORG outside their company's porg list`);
+});
+
+test('JDE: every F4311.MCU belongs to its F4301.KCOO business unit list', () => {
+  const result = runJdeFullP2P(200);
+  const poCompanyMap = {};
+  result.f4301.forEach(h => { poCompanyMap[h.DOCO] = h.KCOO; });
+
+  let violations = 0;
+  result.f4311.forEach(line => {
+    const kcoo = poCompanyMap[line.DOCO];
+    if (!kcoo) return;
+    const units = JDE_ORG[kcoo];
+    if (!units) return;
+    if (!units.includes(line.MCU)) violations++;
+  });
+  assert.equal(violations, 0, `${violations} F4311 lines have MCU outside their company's business unit list`);
+});
+
+test('SAP: EKPO rows have UNSPSC_CODE field (8 digits)', () => {
+  const result = runFullP2P(50);
+  result.ekpo.forEach((line, i) => {
+    assert.ok(typeof line.UNSPSC_CODE === 'string' && /^\d{8}$/.test(line.UNSPSC_CODE),
+      `EKPO row ${i}: invalid UNSPSC_CODE "${line.UNSPSC_CODE}"`);
+  });
+});
+
+test('JDE: F4311 rows have UNSPSC_CODE field and commodity-consistent SRP3', () => {
+  const result = runJdeFullP2P(50);
+  const validSrps = new Set(CATALOGUE.map(c => c.jdeSrp));
+  result.f4311.forEach((line, i) => {
+    assert.ok(typeof line.UNSPSC_CODE === 'string' && /^\d{8}$/.test(line.UNSPSC_CODE),
+      `F4311 row ${i}: invalid UNSPSC_CODE "${line.UNSPSC_CODE}"`);
+    assert.ok(validSrps.has(line.SRP3),
+      `F4311 row ${i}: unknown SRP3 "${line.SRP3}"`);
+  });
+});
+
+test('D365: PurchLine rows have UNSPSC_CODE and ProcurementCategory from catalogue', () => {
+  const result = runD365FullP2P(50);
+  const validCats = new Set(CATALOGUE.map(c => c.d365Cat));
+  result.purchLine.forEach((line, i) => {
+    assert.ok(typeof line.UNSPSC_CODE === 'string' && /^\d{8}$/.test(line.UNSPSC_CODE),
+      `PurchLine row ${i}: invalid UNSPSC_CODE "${line.UNSPSC_CODE}"`);
+    assert.ok(validCats.has(line.ProcurementCategory),
+      `PurchLine row ${i}: unknown ProcurementCategory "${line.ProcurementCategory}"`);
+  });
+});
+
+test('EKPO: prices are within commodity catalogue ranges (no $0.01 pencils at $45k)', () => {
+  const catMap = {};
+  CATALOGUE.forEach(c => { catMap[c.sapMatkl] = c; });
+  const result = runFullP2P(100);
+  let outOfRange = 0;
+  result.ekpo.forEach(line => {
+    const cat = catMap[line.MATKL];
+    if (!cat) return;
+    if (line.NETPR < cat.priceMin * 0.5 || line.NETPR > cat.priceMax * 2) outOfRange++;
+  });
+  // Allow small tolerance — commodity is picked independently per line
+  assert.ok(outOfRange === 0, `${outOfRange} EKPO lines have prices wildly outside category range`);
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SECTION 8: CLI smoke tests
+// ═══════════════════════════════════════════════════════════════════════════
+
+section('8. CLI smoke tests');
 
 const ROOT = path.resolve(__dirname, '..');
 

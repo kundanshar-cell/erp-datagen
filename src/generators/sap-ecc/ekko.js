@@ -1,14 +1,14 @@
 const { faker } = require('@faker-js/faker');
 const { seasonalDate } = require('../../utils/dates');
+const { sapPorgForCompany, SAP_ORG } = require('../../utils/org-hierarchy');
 
 // SAP ECC EKKO — Purchase Order Header
 // Field names match SAP table conventions
 
 const DOC_TYPES = ['NB', 'FO', 'UB', 'ZNB'];  // Standard PO, Framework Order, Stock Transfer, Custom
-const PURCHASING_ORGS = ['1000', '2000', '3000', 'GBPO', 'USPO', 'INDE'];
 const PURCHASING_GROUPS = ['001', '002', '010', '020', 'A01', 'B01'];
 const CURRENCIES = ['GBP', 'USD', 'EUR', 'INR', 'SGD', 'JPY'];
-const COMPANY_CODES = ['1000', '2000', '3000', 'GB01', 'US01', 'IN01'];
+const COMPANY_CODES = Object.keys(SAP_ORG);   // Derived from org hierarchy config
 const PAYMENT_TERMS = ['NT30', 'NT60', 'NT90', '0001', '0002', 'Z030'];
 const INCOTERMS = ['EXW', 'FOB', 'CIF', 'DDP', 'DAP', 'FCA'];
 const DOC_STATUSES = ['', 'B', 'Z'];  // Open, PO released, Closed
@@ -40,13 +40,15 @@ function generateEKKORow(index, options = {}) {
 
   const docType = faker.helpers.arrayElement(DOC_TYPES);
 
+  const bukrs = faker.helpers.arrayElement(COMPANY_CODES);
+
   return {
     EBELN: padEbeln(4500000000 + index),   // SAP PO numbers typically start with 45
-    BUKRS: faker.helpers.arrayElement(COMPANY_CODES),
+    BUKRS: bukrs,
     BSTYP: 'F',                             // F = Purchase Order
     BSART: docType,
     LIFNR: lifnr,
-    EKORG: faker.helpers.arrayElement(PURCHASING_ORGS),
+    EKORG: sapPorgForCompany(bukrs),        // Purchasing org must be assigned to company code
     EKGRP: faker.helpers.arrayElement(PURCHASING_GROUPS),
     WAERS: faker.helpers.arrayElement(CURRENCIES),
     BEDAT: sapDate(poDate),

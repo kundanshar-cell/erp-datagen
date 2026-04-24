@@ -1,19 +1,20 @@
 const { faker } = require('@faker-js/faker');
 const { toJulian } = require('./f4301');
+const { jdeMcuForCompany } = require('../../utils/org-hierarchy');
+const { pickCommodity, randomItem, randomUom, randomPrice, randomUnspsc } = require('../../utils/commodity');
 
 // JDE E1 F4311 — Purchase Order Detail (Line Items)
 // Each line links to F4301 via DOCO+DCTO+KCOO
 // JDE line numbers are decimal: 1.00, 2.00, 3.00...
 
-const UNITS_OF_MEASURE = ['EA', 'KG', 'LT', 'MT', 'BX', 'PL', 'HR', 'DY', 'CS'];
-const BUSINESS_UNITS = ['00001', '00002', 'M10', 'M20', 'WH01', 'WH02'];
 const LINE_STATUSES = ['200', '280', '400', '999'];  // Open, Partially received, Closed, Cancelled
 const ACCOUNT_CODES = ['4000', '4100', '4200', '5000', '5100', '6000'];
 
-function generateItemNumber() {
+function generateItemNumber(cat) {
+  const prefix = cat.jdeSrp;
   const formats = [
     () => String(faker.number.int({ min: 100000, max: 999999 })),
-    () => `${faker.helpers.arrayElement(['COMP', 'SERV', 'MRO', 'IT'])}-${faker.number.int({ min: 1000, max: 9999 })}`,
+    () => `${prefix}-${faker.number.int({ min: 1000, max: 9999 })}`,
     () => faker.string.alphanumeric(8).toUpperCase(),
   ];
   return faker.helpers.arrayElement(formats)();
@@ -25,14 +26,16 @@ function generateF4311Row(lineIndex, doco, dcto, kcoo, orderDate, crcd, options 
   const maybeBlank = (value) =>
     Math.random() < missingRate ? '' : value;
 
-  const qty = faker.number.float({ min: 1, max: 1000, fractionDigits: 2 });
-  const unitCost = faker.number.float({ min: 1, max: 50000, fractionDigits: 4 });
+  // Commodity-driven item — description, UOM, and price all consistent with category
+  const cat = pickCommodity();
+  const qty = faker.number.float({ min: 1, max: 500, fractionDigits: 2 });
+  const unitCost = randomPrice(cat);
   const extPrice = parseFloat((qty * unitCost).toFixed(2));
 
   const recdDate = new Date(orderDate);
   recdDate.setDate(recdDate.getDate() + faker.number.int({ min: 7, max: 90 }));
 
-  const itemNum = generateItemNumber();
+  const itemNum = generateItemNumber(cat);
 
   return {
     DOCO: doco,                                                   // PO number (links to F4301)
@@ -40,13 +43,14 @@ function generateF4311Row(lineIndex, doco, dcto, kcoo, orderDate, crcd, options 
     KCOO: kcoo,                                                   // Company key
     LNID: parseFloat(((lineIndex + 1) * 1.0).toFixed(2)),         // Line number (1.00, 2.00...)
     ITM:  faker.number.int({ min: 100000, max: 999999 }),         // Item number (short)
-    LITM: itemNum,                                                // Item number (2nd)
-    DSC1: faker.commerce.productName(),                           // Description
-    MCU:  faker.helpers.arrayElement(BUSINESS_UNITS),             // Branch/plant
+    LITM: itemNum,                                                // Item number (2nd) — prefixed by category
+    DSC1: randomItem(cat),                                        // Description from commodity catalogue
+    SRP3: cat.jdeSrp,                                             // Commodity code (JDE item category)
+    MCU:  jdeMcuForCompany(kcoo),                                 // Branch/plant consistent with company key
     LOCN: maybeBlank(faker.string.alphanumeric(8).toUpperCase()), // Location
     UORG: qty,                                                    // Order quantity
-    UOM:  faker.helpers.arrayElement(UNITS_OF_MEASURE),           // Unit of measure
-    PRRC: unitCost,                                               // Unit cost
+    UOM:  randomUom(cat),                                         // UOM appropriate for commodity
+    PRRC: unitCost,                                               // Unit cost in category range
     AEXP: extPrice,                                               // Extended price
     CRCD: crcd,                                                   // Currency code
     PDDJ: toJulian(recdDate),                                     // Promised delivery date (Julian)
@@ -54,6 +58,7 @@ function generateF4311Row(lineIndex, doco, dcto, kcoo, orderDate, crcd, options 
     LTTR: Math.random() < 0.03 ? '999' : '',                     // Last status (999 = cancelled)
     AN8:  maybeBlank(faker.number.int({ min: 1000, max: 1999 })), // GL account object
     OBJ:  maybeBlank(faker.helpers.arrayElement(ACCOUNT_CODES)),  // Account object
+    UNSPSC_CODE: randomUnspsc(cat),                               // Yukti training label
   };
 }
 

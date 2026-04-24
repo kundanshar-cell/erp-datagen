@@ -36,6 +36,7 @@ function runFullP2P(rows, options = {}) {
       EBELN: h.EBELN,
       BEDAT: h.BEDAT,
       WAERS: h.WAERS,
+      BUKRS: h.BUKRS,   // Thread company code so EKPO.WERKS is from the correct plant list
     })),
     linesPerPO: { min: 1, max: 5 },
   });
@@ -68,7 +69,9 @@ function runFullP2P(rows, options = {}) {
   // --- Step 6: Invoice Headers (RBKP) linked to vendors ---
   // Roughly one invoice per 4 PO lines
   const invoiceHeaderCount = Math.max(3, Math.floor(ekpo.length / 4));
-  const rbkp = generateRBKP(invoiceHeaderCount, { missingRate, vendorPool: weightedVendorPool });
+  // Pass the company codes actually used in this run — RBKP.BUKRS should stay within scope
+  const usedBukrs = [...new Set(ekko.map(h => h.BUKRS))];
+  const rbkp = generateRBKP(invoiceHeaderCount, { missingRate, vendorPool: weightedVendorPool, companyCodePool: usedBukrs });
 
   // --- Step 7: Invoice Lines (RSEG) linked to RBKP + EKPO ---
   const rseg = generateRSEG(ekpo.length, {
