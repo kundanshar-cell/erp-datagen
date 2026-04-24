@@ -66,20 +66,42 @@ function runFullP2P(rows, options = {}) {
     linesPerGR: { min: 1, max: 4 },
   });
 
-  // --- Step 6: Invoice Headers (RBKP) linked to vendors ---
+  // --- Step 6: PO-backed Invoice Headers (RBKP) ---
   // Roughly one invoice per 4 PO lines
   const invoiceHeaderCount = Math.max(3, Math.floor(ekpo.length / 4));
-  // Pass the company codes actually used in this run — RBKP.BUKRS should stay within scope
   const usedBukrs = [...new Set(ekko.map(h => h.BUKRS))];
   const rbkp = generateRBKP(invoiceHeaderCount, { missingRate, vendorPool: weightedVendorPool, companyCodePool: usedBukrs });
 
-  // --- Step 7: Invoice Lines (RSEG) linked to RBKP + EKPO ---
+  // --- Step 7: PO-backed Invoice Lines (RSEG) ---
   const rseg = generateRSEG(ekpo.length, {
     missingRate,
-    invoicePool: rbkp.map(i => ({ BELNR: i.BELNR, GJAHR: i.GJAHR, WAERS: i.WAERS })),
+    invoicePool: rbkp.map(i => ({
+      BELNR: i.BELNR, GJAHR: i.GJAHR, WAERS: i.WAERS,
+      IS_CREDIT_MEMO: i.IS_CREDIT_MEMO, IS_NON_PO_INVOICE: false,
+    })),
     poPool: poLinePool,
     linesPerInvoice: { min: 1, max: 6 },
   });
+
+  // --- Step 7b: Non-PO Invoice Headers + Lines (~20% of invoice volume) ---
+  // Rent, utilities, subscriptions, professional fees — no EKKO/EKPO backing
+  const nonPoInvoiceCount = Math.max(2, Math.floor(invoiceHeaderCount * 0.20));
+  const nonPoRbkp = generateRBKP(nonPoInvoiceCount, {
+    missingRate, vendorPool: weightedVendorPool, companyCodePool: usedBukrs, forceNonPO: true,
+  });
+  const nonPoRseg = generateRSEG(nonPoInvoiceCount * 2, {
+    missingRate,
+    invoicePool: nonPoRbkp.map(i => ({
+      BELNR: i.BELNR, GJAHR: i.GJAHR, WAERS: i.WAERS,
+      IS_CREDIT_MEMO: i.IS_CREDIT_MEMO, IS_NON_PO_INVOICE: true,
+    })),
+    // No poPool — GL-only lines
+    linesPerInvoice: { min: 1, max: 3 },
+  });
+
+  // Merge PO-backed and non-PO invoices into single tables
+  rbkp.push(...nonPoRbkp);
+  rseg.push(...nonPoRseg);
 
   // --- Step 8: Split invoices — ~5% of PO lines invoiced across 2 separate invoice documents ---
   // Real scenario: vendor sends partial invoice first, remaining balance on a second invoice.
@@ -107,6 +129,8 @@ function runFullP2P(rows, options = {}) {
         KZBEW:      '',
         XNEGP:      '',
         HASPRICEVAR: false,
+        IS_CREDIT_LINE:    false,
+        IS_NON_PO_INVOICE: false,
         IS_SPLIT_INVOICE: true,                                      // Second invoice for same PO line
       });
     }

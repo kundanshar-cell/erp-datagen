@@ -68,14 +68,24 @@ function runJdeFullP2P(rows, options = {}) {
   const grCount = Math.max(3, Math.floor(f4311.length / 3) * 2);
   const f43121 = generateF43121(grCount, { missingRate, poLinePool });
 
-  // --- Step 5: AP Invoices (F0411) linked to F4301 + vendors ---
+  // --- Step 5: PO-backed AP Invoices (F0411) ---
   const invoiceCount = Math.max(3, Math.floor(f4311.length / 4));
   const f0411 = generateF0411(invoiceCount, {
     missingRate,
     vendorPool: weightedVendorPool,
     poPool: f4301,
-    poTotalAmountMap,                                        // PO total amounts for realistic invoice amounts
+    poTotalAmountMap,
   });
+
+  // --- Step 5b: Non-PO Invoices (~20% of invoice volume) ---
+  // Direct AP vouchers with no PO backing (rent, subscriptions, professional fees)
+  const nonPoInvoiceCount = Math.max(2, Math.floor(invoiceCount * 0.20));
+  const nonPoF0411 = generateF0411(nonPoInvoiceCount, {
+    missingRate,
+    vendorPool: weightedVendorPool,
+    forceNonPO: true,
+  });
+  f0411.push(...nonPoF0411);
 
   // --- Step 6: Split invoices — ~5% of POs get a second partial invoice document ---
   // First invoice already generated above; second invoice covers remaining ~40% of PO value.

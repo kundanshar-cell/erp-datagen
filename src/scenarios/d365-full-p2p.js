@@ -66,7 +66,7 @@ function runD365FullP2P(rows, options = {}) {
     })),
   });
 
-  // --- Step 5: Invoice Headers (VendInvoiceJour) linked to PurchTable + vendors ---
+  // --- Step 5: PO-backed Invoice Headers (VendInvoiceJour) ---
   const invoiceCount = Math.max(3, Math.floor(purchLine.length / 4));
   const invoiceJour = generateVendInvoiceJour(invoiceCount, {
     missingRate,
@@ -79,7 +79,15 @@ function runD365FullP2P(rows, options = {}) {
     })),
   });
 
-  // --- Step 6: Invoice Lines (VendInvoiceTrans) linked to VendInvoiceJour + PurchLine ---
+  // --- Step 5b: Non-PO Invoice Headers (~20% of invoice volume) ---
+  const nonPoInvoiceCount = Math.max(2, Math.floor(invoiceCount * 0.20));
+  const nonPoInvoiceJour = generateVendInvoiceJour(nonPoInvoiceCount, {
+    missingRate, vendorPool: weightedVendorPool, forceNonPO: true,
+  });
+  invoiceJour.push(...nonPoInvoiceJour);
+
+  // --- Step 6: Invoice Lines (VendInvoiceTrans) ---
+  // Pass IsCreditNote + IS_NON_PO_INVOICE from header so trans lines are consistent
   const invoiceTrans = generateVendInvoiceTrans(purchLine.length, {
     missingRate,
     invoicePool: invoiceJour.map(i => ({
@@ -87,6 +95,8 @@ function runD365FullP2P(rows, options = {}) {
       DataAreaId:          i.DataAreaId,
       PurchId:             i.PurchId,
       InvoiceCurrencyCode: i.InvoiceCurrencyCode,
+      IsCreditNote:        i.IsCreditNote,
+      IS_NON_PO_INVOICE:   i.IS_NON_PO_INVOICE,
     })),
     poLinePool,
     linesPerInvoice: { min: 1, max: 6 },
@@ -116,6 +126,7 @@ function runD365FullP2P(rows, options = {}) {
         TaxGroup:            '',
         HasPriceVariance:    false,
         IsCreditLine:        false,
+        IS_NON_PO_INVOICE:   false,
         IS_SPLIT_INVOICE:    true,                                   // Second invoice for same PO line
       });
     });

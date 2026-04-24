@@ -375,6 +375,8 @@ section('2. Three-way match linkage — D365');
     let checked = 0;
     for (const inv of d365.invoiceTrans) {
       if (inv.IS_SPLIT_INVOICE) continue;    // split invoices intentionally cover 30-50% of PO
+      if (inv.IsCreditLine) continue;        // credit note lines have negative qty — skip ratio check
+      if (inv.IS_NON_PO_INVOICE) continue;   // non-PO lines have no PO to compare against
       const poLine = plMap[`${inv.PurchId}|${inv.PurchLineNum}`];
       if (!poLine) continue;
       checked++;
@@ -432,8 +434,10 @@ section('3. Referential integrity');
     }
   });
 
-  test('SAP: every RSEG.EBELN exists in EKPO', () => {
+  test('SAP: every RSEG.EBELN exists in EKPO (skip non-PO and credit lines)', () => {
     for (const inv of sap.rseg) {
+      if (inv.IS_NON_PO_INVOICE) continue;   // Non-PO lines have blank EBELN by design
+      if (!inv.EBELN) continue;              // Split/standalone rows without EBELN
       assert.ok(ekpoEbelns.has(inv.EBELN),
         `RSEG EBELN ${inv.EBELN} not found in EKPO`);
     }
@@ -456,8 +460,10 @@ section('3. Referential integrity');
   const d365 = runD365FullP2P(100);
   const purchIds = new Set(d365.purchLine.map(l => l.PurchId));
 
-  test('D365: every VendInvoiceTrans.PurchId exists in PurchLine', () => {
+  test('D365: every VendInvoiceTrans.PurchId exists in PurchLine (skip non-PO)', () => {
     for (const inv of d365.invoiceTrans) {
+      if (inv.IS_NON_PO_INVOICE) continue;   // Non-PO lines have blank PurchId by design
+      if (!inv.PurchId) continue;
       assert.ok(purchIds.has(inv.PurchId),
         `VendInvoiceTrans PurchId ${inv.PurchId} not found in PurchLine`);
     }
@@ -757,10 +763,97 @@ test('EKPO: prices are within commodity catalogue ranges (no $0.01 pencils at $4
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  SECTION 8: CLI smoke tests
+//  SECTION 8: Credit notes and non-PO invoices
 // ═══════════════════════════════════════════════════════════════════════════
 
-section('8. CLI smoke tests');
+section('8. Credit notes and non-PO invoices');
+
+test('SAP: RBKP has credit memo rows (BLART=KR) with negative WRBTR', () => {
+  const result = runFullP2P(200);
+  const creditMemos = result.rbkp.filter(r => r.IS_CREDIT_MEMO);
+  assert.ok(creditMemos.length > 0, 'Expected at least one credit memo in RBKP');
+  creditMemos.forEach((r, i) => {
+    assert.ok(r.WRBTR < 0, `Credit memo RBKP row ${i}: WRBTR should be negative, got ${r.WRBTR}`);
+    assert.equal(r.BLART, 'KR', `Credit memo RBKP row ${i}: BLART should be KR`);
+  });
+});
+
+test('SAP: non-PO invoices present (~20% of RBKP) with blank RSEG.EBELN', () => {
+  const result = runFullP2P(200);
+  const nonPoRbkp = result.rbkp.filter(r => r.IS_NON_PO_INVOICE);
+  assert.ok(nonPoRbkp.length > 0, 'Expected non-PO RBKP rows');
+  const nonPoRseg = result.rseg.filter(r => r.IS_NON_PO_INVOICE);
+  assert.ok(nonPoRseg.length > 0, 'Expected non-PO RSEG rows');
+  nonPoRseg.forEach((r, i) => {
+    assert.equal(r.EBELN, '', `Non-PO RSEG row ${i}: EBELN should be blank`);
+    assert.ok(r.SAKTO !== '', `Non-PO RSEG row ${i}: SAKTO (GL account) should be set`);
+  });
+});
+
+test('SAP: credit memo RSEG lines have negative WRBTR and XNEGP=X', () => {
+  const result = runFullP2P(300);
+  const creditLines = result.rseg.filter(r => r.IS_CREDIT_LINE);
+  assert.ok(creditLines.length > 0, 'Expected credit memo RSEG lines');
+  creditLines.forEach((r, i) => {
+    assert.ok(r.WRBTR < 0, `Credit RSEG row ${i}: WRBTR should be negative, got ${r.WRBTR}`);
+    assert.equal(r.XNEGP, 'X', `Credit RSEG row ${i}: XNEGP should be X`);
+  });
+});
+
+test('JDE: F0411 has credit memos (DCT=PX) with negative AG', () => {
+  const result = runJdeFullP2P(200);
+  const creditMemos = result.f0411.filter(r => r.IS_CREDIT_MEMO);
+  assert.ok(creditMemos.length > 0, 'Expected credit memo F0411 rows');
+  creditMemos.forEach((r, i) => {
+    assert.ok(r.AG < 0, `Credit memo F0411 row ${i}: AG should be negative, got ${r.AG}`);
+    assert.equal(r.DCT, 'PX', `Credit memo F0411 row ${i}: DCT should be PX`);
+  });
+});
+
+test('JDE: non-PO invoices present with PDOC=0', () => {
+  const result = runJdeFullP2P(200);
+  const nonPo = result.f0411.filter(r => r.IS_NON_PO_INVOICE);
+  assert.ok(nonPo.length > 0, 'Expected non-PO F0411 rows');
+  nonPo.forEach((r, i) => {
+    assert.equal(r.PDOC, 0, `Non-PO F0411 row ${i}: PDOC should be 0`);
+    assert.equal(r.PDCT, '', `Non-PO F0411 row ${i}: PDCT should be blank`);
+  });
+});
+
+test('D365: non-PO invoice headers have blank PurchId', () => {
+  const result = runD365FullP2P(200);
+  const nonPo = result.invoiceJour.filter(r => r.IS_NON_PO_INVOICE);
+  assert.ok(nonPo.length > 0, 'Expected non-PO VendInvoiceJour rows');
+  nonPo.forEach((r, i) => {
+    assert.equal(r.PurchId, '', `Non-PO VendInvoiceJour row ${i}: PurchId should be blank`);
+  });
+});
+
+test('D365: credit note trans lines are negative and IsCreditLine=true', () => {
+  const result = runD365FullP2P(300);
+  const creditTrans = result.invoiceTrans.filter(r => r.IsCreditLine && !r.IS_SPLIT_INVOICE);
+  assert.ok(creditTrans.length > 0, 'Expected credit note VendInvoiceTrans rows');
+  creditTrans.forEach((r, i) => {
+    assert.ok(r.LineAmount < 0, `Credit trans row ${i}: LineAmount should be negative, got ${r.LineAmount}`);
+    assert.ok(r.Qty < 0, `Credit trans row ${i}: Qty should be negative, got ${r.Qty}`);
+  });
+});
+
+test('D365: non-PO trans lines have blank PurchId and MainAccountId set', () => {
+  const result = runD365FullP2P(200);
+  const nonPoTrans = result.invoiceTrans.filter(r => r.IS_NON_PO_INVOICE);
+  assert.ok(nonPoTrans.length > 0, 'Expected non-PO VendInvoiceTrans rows');
+  nonPoTrans.forEach((r, i) => {
+    assert.equal(r.PurchId, '', `Non-PO trans row ${i}: PurchId should be blank`);
+    assert.ok(r.MainAccountId, `Non-PO trans row ${i}: MainAccountId should be set`);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SECTION 9: CLI smoke tests
+// ═══════════════════════════════════════════════════════════════════════════
+
+section('9. CLI smoke tests');
 
 const ROOT = path.resolve(__dirname, '..');
 
