@@ -21,6 +21,7 @@ function padZeile(num) {
 function generateMSEGRow(lineIndex, mblnr, mjahr, options = {}) {
   const missingRate = options.missingRate || 0;
   const poPool = options.poPool || [];    // Array of { EBELN, EBELP, MATNR, MENGE, MEINS, NETPR, WAERS, WERKS }
+  const grPool = options.grPool || [];    // All GR headers — used to reference original doc in reversals
 
   const maybeBlank = (value) =>
     Math.random() < missingRate ? '' : value;
@@ -53,10 +54,18 @@ function generateMSEGRow(lineIndex, mblnr, mjahr, options = {}) {
   const receivedQty = parseFloat((orderedQty * faker.number.float({ min: 0.6, max: 1.0, fractionDigits: 2 })).toFixed(3));
   const amount = parseFloat((receivedQty * unitPrice).toFixed(2));
 
-  // 5% chance of reversal movement type
-  const bwart = Math.random() < 0.05
-    ? faker.helpers.arrayElement(['102', '122'])
+  // 5% chance of reversal — 102 (simple reversal) is 4x more common than 122 (return to vendor)
+  const isReversal = Math.random() < 0.05;
+  const bwart = isReversal
+    ? (Math.random() < 0.80 ? '102' : '122')
     : '101';
+
+  // SMBLN: reference to the original GR document being reversed
+  // Pick any other GR in the pool — in real SAP this is the specific doc being cancelled
+  const otherGRs = grPool.filter(g => g.MBLNR !== mblnr);
+  const smbln = isReversal && otherGRs.length > 0
+    ? faker.helpers.arrayElement(otherGRs).MBLNR
+    : '';
 
   return {
     MBLNR: mblnr,
@@ -68,17 +77,19 @@ function generateMSEGRow(lineIndex, mblnr, mjahr, options = {}) {
     MATNR: matnr,
     WERKS: werks,
     LGORT: maybeBlank(faker.helpers.arrayElement(STORAGE_LOCATIONS)),
-    CHARG: maybeBlank(                                               // Batch number — not all materials are batch-managed
+    CHARG: maybeBlank(
       Math.random() < 0.3 ? faker.string.alphanumeric(10).toUpperCase() : ''
     ),
     MENGE: receivedQty,
     MEINS: meins,
-    DMBTR: amount,                                                   // Amount in local currency
+    DMBTR: amount,
     WAERS: waers,
-    INSMK: faker.helpers.arrayElement(STOCK_TYPES),                 // Stock type (QI, blocked, unrestricted)
+    INSMK: faker.helpers.arrayElement(STOCK_TYPES),
     LIFNR: maybeBlank(
       String(faker.number.int({ min: 1000000, max: 1099999 })).padStart(10, '0')
     ),
+    SMBLN: smbln,                                                    // Original GR document (for reversals)
+    STORNO: isReversal ? 'X' : '',                                   // Reversal indicator
   };
 }
 

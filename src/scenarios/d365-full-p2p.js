@@ -91,6 +91,35 @@ function runD365FullP2P(rows, options = {}) {
     linesPerInvoice: { min: 1, max: 6 },
   });
 
+  // --- Step 7: Split invoices — ~5% of PO lines invoiced across 2 separate vouchers ---
+  const splitCandidates = poLinePool.filter(() => Math.random() < 0.05);
+  if (splitCandidates.length > 0 && invoiceJour.length >= 2) {
+    splitCandidates.forEach(poLine => {
+      const secondInv = faker.helpers.arrayElement(invoiceJour);
+      const splitQty   = parseFloat((poLine.PurchQty * faker.number.float({ min: 0.30, max: 0.50, fractionDigits: 2 })).toFixed(2));
+      const splitPrice = parseFloat((poLine.PurchPrice * (1 + (Math.random() * 0.01 - 0.005))).toFixed(2));
+      invoiceTrans.push({
+        LedgerVoucher:       secondInv.LedgerVoucher,
+        LineNum:             invoiceTrans.filter(r => r.LedgerVoucher === secondInv.LedgerVoucher).length + 1,
+        DataAreaId:          poLine.DataAreaId,
+        PurchId:             poLine.PurchId,
+        PurchLineNum:        poLine.LineNumber,
+        ItemId:              faker.helpers.arrayElement([`D${faker.number.int({min:1000,max:9999})}`, faker.string.alphanumeric(8).toUpperCase()]),
+        Name:                faker.commerce.productName(),
+        ProcurementCategory: faker.helpers.arrayElement(['IT Equipment','Office Supplies','Maintenance','Services']),
+        Qty:                 splitQty,
+        Unit:                poLine.PurchUnit,
+        Price:               splitPrice,
+        LineAmount:          parseFloat((splitQty * splitPrice).toFixed(2)),
+        CurrencyCode:        secondInv.InvoiceCurrencyCode,
+        TaxGroup:            '',
+        HasPriceVariance:    false,
+        IsCreditLine:        false,
+        IS_SPLIT_INVOICE:    true,                                   // Second invoice for same PO line
+      });
+    });
+  }
+
   return { vendTable, purchTable, purchLine, packingSlipJour, invoiceJour, invoiceTrans };
 }
 

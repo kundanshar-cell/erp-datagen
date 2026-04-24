@@ -76,6 +76,37 @@ function runJdeFullP2P(rows, options = {}) {
     poTotalAmountMap,                                        // PO total amounts for realistic invoice amounts
   });
 
+  // --- Step 6: Split invoices — ~5% of POs get a second partial invoice document ---
+  // First invoice already generated above; second invoice covers remaining ~40% of PO value.
+  const splitPOs = f4301.filter(() => Math.random() < 0.05);
+  splitPOs.forEach((po, i) => {
+    const poTotal = poTotalAmountMap[po.DOCO] || 0;
+    if (poTotal === 0) return;
+    const splitAmount = parseFloat((poTotal * faker.number.float({ min: 0.30, max: 0.50, fractionDigits: 3 })).toFixed(2));
+    const taxRate = faker.helpers.arrayElement([0, 0.05, 0.10, 0.20]);
+    f0411.push({
+      DOC:  400000 + i,                                              // Different number range for split invoices
+      DCT:  'PV',
+      KCO:  faker.helpers.arrayElement(['00001', '00002', '10000', '20000']),
+      VEND: po.VEND || (weightedVendorPool.length > 0 ? faker.helpers.arrayElement(weightedVendorPool) : 1000),
+      ISTR: po.TRDJ,                                                 // Same order date as original PO
+      DGJ:  po.TRDJ,
+      AG:   splitAmount,
+      XTAM: parseFloat((splitAmount * taxRate).toFixed(2)),
+      CRCD: po.CRCD,
+      VINV: faker.string.alphanumeric(16).toUpperCase(),
+      PDOC: po.DOCO,                                                 // Same PO — this is the split
+      PDCT: 'OP',
+      PYIN: faker.helpers.arrayElement(['C', 'W', 'D', 'E']),
+      PYST: '',
+      DKCO: '',
+      STAM: '',
+      RMSG: '',
+      RNME: '',
+      IS_SPLIT_INVOICE: true,
+    });
+  });
+
   return { f0101, f4301, f4311, f43121, f0411 };
 }
 

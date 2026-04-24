@@ -275,6 +275,7 @@ section('2. Three-way match linkage — SAP ECC');
   test('SAP invoice qty (RSEG.MENGE) is 45-105% of PO qty (EKPO.MENGE)', () => {
     let checked = 0;
     for (const inv of sap.rseg) {
+      if (inv.IS_SPLIT_INVOICE) continue;          // Split invoices intentionally have 30-50% qty
       const poLine = ekpoMap[`${inv.EBELN}|${inv.EBELP}`];
       if (!poLine) continue;
       checked++;
@@ -341,7 +342,8 @@ section('2. Three-way match linkage — JDE');
 
     let checked = 0;
     for (const inv of jde.f0411) {
-      if (inv.DCT === 'PX') continue; // credit memos are negative
+      if (inv.DCT === 'PX') continue;        // credit memos are negative
+      if (inv.IS_SPLIT_INVOICE) continue;    // split invoices intentionally cover 30-50% of PO
       const poTotal = poTotals[inv.PDOC];
       if (!poTotal) continue;
       checked++;
@@ -372,6 +374,7 @@ section('2. Three-way match linkage — D365');
   test('D365 invoice qty (VendInvoiceTrans.Qty) is 45-105% of PO qty (PurchLine.PurchQty)', () => {
     let checked = 0;
     for (const inv of d365.invoiceTrans) {
+      if (inv.IS_SPLIT_INVOICE) continue;    // split invoices intentionally cover 30-50% of PO
       const poLine = plMap[`${inv.PurchId}|${inv.PurchLineNum}`];
       if (!poLine) continue;
       checked++;
@@ -505,9 +508,10 @@ section('4. Variance distribution (500 rows)');
   const d365 = runD365FullP2P(500);
 
   test('D365 VendInvoiceTrans: HasPriceVariance is true on 5-15% of lines', () => {
-    const total = d365.invoiceTrans.length;
-    const withVar = d365.invoiceTrans.filter(r => r.HasPriceVariance === true).length;
-    const pct = withVar / total;
+    // Exclude split invoice rows — they always have HasPriceVariance:false (not part of variance test)
+    const normalLines = d365.invoiceTrans.filter(r => !r.IS_SPLIT_INVOICE);
+    const withVar = normalLines.filter(r => r.HasPriceVariance === true).length;
+    const pct = withVar / normalLines.length;
     assert.ok(pct >= 0.05 && pct <= 0.15,
       `HasPriceVariance true rate: ${(pct*100).toFixed(1)}% (expected 5-15%)`);
   });

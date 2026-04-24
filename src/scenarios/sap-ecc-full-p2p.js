@@ -77,6 +77,37 @@ function runFullP2P(rows, options = {}) {
     linesPerInvoice: { min: 1, max: 6 },
   });
 
+  // --- Step 8: Split invoices — ~5% of PO lines invoiced across 2 separate invoice documents ---
+  // Real scenario: vendor sends partial invoice first, remaining balance on a second invoice.
+  // Both RSEG rows share the same EBELN+EBELP but have different BELNR.
+  const splitCandidates = poLinePool.filter(() => Math.random() < 0.05);
+  if (splitCandidates.length > 0 && rbkp.length >= 2) {
+    for (const poLine of splitCandidates) {
+      // Pick a different invoice header for the second invoice
+      const secondInv = faker.helpers.arrayElement(rbkp);
+      const splitQty = parseFloat((poLine.MENGE * faker.number.float({ min: 0.30, max: 0.50, fractionDigits: 3 })).toFixed(3));
+      const splitPrice = parseFloat((poLine.NETPR * (1 + (Math.random() * 0.01 - 0.005))).toFixed(2));
+      rseg.push({
+        BELNR:      secondInv.BELNR,
+        GJAHR:      secondInv.GJAHR,
+        BUZEI:      String(rseg.filter(r => r.BELNR === secondInv.BELNR).length + 1).padStart(5, '0'),
+        EBELN:      poLine.EBELN,
+        EBELP:      poLine.EBELP,
+        MATNR:      poLine.MATNR,
+        MENGE:      splitQty,
+        MEINS:      poLine.MEINS,
+        WRBTR:      parseFloat((splitQty * splitPrice).toFixed(2)),
+        WAERS:      poLine.WAERS,
+        MWSKZ:      faker.helpers.arrayElement(['V1', 'V2', 'V5', 'X0']),
+        SAKTO:      '',
+        KZBEW:      '',
+        XNEGP:      '',
+        HASPRICEVAR: false,
+        IS_SPLIT_INVOICE: true,                                      // Second invoice for same PO line
+      });
+    }
+  }
+
   return { lfa1, ekko, ekpo, mkpf, mseg, rbkp, rseg };
 }
 
