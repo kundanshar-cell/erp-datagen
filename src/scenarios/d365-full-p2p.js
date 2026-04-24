@@ -1,4 +1,5 @@
 const { faker } = require('@faker-js/faker');
+const { buildWeightedVendorPool, tagVendorTiers } = require('../utils/pareto');
 const { generateVendTable }           = require('../generators/d365/vendtable');
 const { generatePurchTable }          = require('../generators/d365/purchtable');
 const { generatePurchLine }           = require('../generators/d365/purchline');
@@ -20,12 +21,14 @@ function runD365FullP2P(rows, options = {}) {
 
   // --- Step 1: Vendors (VendTable) ---
   const vendorCount = Math.max(10, Math.floor(rows * 0.1));
-  const vendTable = generateVendTable(vendorCount, { missingRate });
+  const vendTable = tagVendorTiers(generateVendTable(vendorCount, { missingRate }), 'AccountNum');
   const vendorPool = vendTable.map(v => v.AccountNum);
+  // Weighted pool: strategic vendors (top 20%) get 80% of PO assignments — Pareto distribution
+  const weightedVendorPool = buildWeightedVendorPool(vendorPool);
 
   // --- Step 2: PO Headers (PurchTable) linked to vendors ---
   const poHeaderCount = Math.max(5, Math.floor(rows * 0.2));
-  const purchTable = generatePurchTable(poHeaderCount, { missingRate, vendorPool });
+  const purchTable = generatePurchTable(poHeaderCount, { missingRate, vendorPool: weightedVendorPool });
 
   // --- Step 3: PO Lines (PurchLine) linked to PurchTable ---
   const purchLine = generatePurchLine(rows, {
@@ -66,7 +69,7 @@ function runD365FullP2P(rows, options = {}) {
   const invoiceCount = Math.max(3, Math.floor(purchLine.length / 4));
   const invoiceJour = generateVendInvoiceJour(invoiceCount, {
     missingRate,
-    vendorPool,
+    vendorPool: weightedVendorPool,
     poPool: purchTable.map(h => ({
       PurchId:      h.PurchId,
       DataAreaId:   h.DataAreaId,

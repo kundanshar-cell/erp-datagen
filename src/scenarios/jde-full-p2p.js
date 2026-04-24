@@ -4,6 +4,7 @@ const { generateF4301 } = require('../generators/jde/f4301');
 const { generateF4311 } = require('../generators/jde/f4311');
 const { generateF43121 } = require('../generators/jde/f43121');
 const { generateF0411 } = require('../generators/jde/f0411');
+const { buildWeightedVendorPool, tagVendorTiers } = require('../utils/pareto');
 
 // Full P2P scenario for JDE E1
 // Generates all 5 tables linked by real keys:
@@ -17,12 +18,14 @@ function runJdeFullP2P(rows, options = {}) {
 
   // --- Step 1: Vendors (F0101) ---
   const vendorCount = Math.max(10, Math.floor(rows * 0.1));
-  const f0101 = generateF0101(vendorCount, { missingRate });
+  const f0101 = tagVendorTiers(generateF0101(vendorCount, { missingRate }), 'AN8');
   const vendorPool = f0101.map(v => v.AN8);
+  // Weighted pool: strategic vendors (top 20%) get 80% of PO assignments — Pareto distribution
+  const weightedVendorPool = buildWeightedVendorPool(vendorPool);
 
   // --- Step 2: PO Headers (F4301) linked to vendors ---
   const poHeaderCount = Math.max(5, Math.floor(rows * 0.2));
-  const f4301 = generateF4301(poHeaderCount, { missingRate, vendorPool });
+  const f4301 = generateF4301(poHeaderCount, { missingRate, vendorPool: weightedVendorPool });
 
   // --- Step 3: PO Lines (F4311) linked to F4301 ---
   const f4311 = generateF4311(rows, {
@@ -68,7 +71,7 @@ function runJdeFullP2P(rows, options = {}) {
   const invoiceCount = Math.max(3, Math.floor(f4311.length / 4));
   const f0411 = generateF0411(invoiceCount, {
     missingRate,
-    vendorPool,
+    vendorPool: weightedVendorPool,
     poPool: f4301,
     poTotalAmountMap,                                        // PO total amounts for realistic invoice amounts
   });
