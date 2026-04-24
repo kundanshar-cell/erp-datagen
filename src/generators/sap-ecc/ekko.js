@@ -1,4 +1,5 @@
 const { faker } = require('@faker-js/faker');
+const { seasonalDate } = require('../../utils/dates');
 
 // SAP ECC EKKO — Purchase Order Header
 // Field names match SAP table conventions
@@ -32,7 +33,7 @@ function generateEKKORow(index, options = {}) {
     ? faker.helpers.arrayElement(vendorPool)
     : String(faker.number.int({ min: 1000000, max: 1099999 })).padStart(10, '0');
 
-  const poDate = faker.date.between({ from: '2022-01-01', to: '2025-12-31' });
+  const poDate = seasonalDate();
   const validFrom = new Date(poDate);
   const validTo = new Date(poDate);
   validTo.setFullYear(validTo.getFullYear() + 1);

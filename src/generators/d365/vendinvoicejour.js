@@ -1,4 +1,5 @@
 const { faker } = require('@faker-js/faker');
+const { seasonalDate, invoicePostingDate } = require('../../utils/dates');
 
 // D365 F&O VendInvoiceJour — Vendor Invoice Header
 // Linked to PurchTable via PurchId
@@ -40,7 +41,7 @@ function generateVendInvoiceJourRow(index, options = {}) {
     currencyCode = faker.helpers.arrayElement(CURRENCIES);
   }
 
-  const invoiceDate = faker.date.between({ from: '2022-01-01', to: '2025-12-31' });
+  const invoiceDate = seasonalDate();
   const dueDate = new Date(invoiceDate);
   dueDate.setDate(dueDate.getDate() + faker.number.int({ min: 30, max: 90 }));
 
@@ -68,7 +69,7 @@ function generateVendInvoiceJourRow(index, options = {}) {
     DisputeReason:       isDispute
       ? faker.helpers.arrayElement(['Price mismatch', 'Goods not received', 'Duplicate invoice', 'Quantity dispute'])
       : '',
-    PostingDate:         isoDate(invoiceDate),
+    PostingDate:         isoDate(invoicePostingDate(invoiceDate)),
   };
 }
 

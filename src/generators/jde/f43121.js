@@ -1,5 +1,6 @@
 const { faker } = require('@faker-js/faker');
 const { toJulian } = require('./f4301');
+const { seasonalDate } = require('../../utils/dates');
 
 // JDE E1 F43121 — Purchase Order Receiver (Goods Receipt)
 // Links back to F4301/F4311 via PDOC+PDCT+KCOO+PLIN
@@ -42,7 +43,7 @@ function generateF43121Row(index, options = {}) {
     poOrderedQty = faker.number.float({ min: 1, max: 500, fractionDigits: 2 });
   }
 
-  const receiptDate = faker.date.between({ from: '2022-01-01', to: '2025-12-31' });
+  const receiptDate = seasonalDate();
 
   // Partial receipts — receive 60–100% of PO ordered qty
   const urec = parseFloat((poOrderedQty * faker.number.float({ min: 0.6, max: 1.0, fractionDigits: 2 })).toFixed(2));

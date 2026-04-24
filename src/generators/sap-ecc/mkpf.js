@@ -1,4 +1,5 @@
 const { faker } = require('@faker-js/faker');
+const { seasonalDate } = require('../../utils/dates');
 
 // SAP ECC MKPF — Material Document Header (Goods Receipt)
 // One MKPF document per GR posting event
@@ -21,7 +22,7 @@ function generateMKPFRow(index, options = {}) {
   const maybeBlank = (value) =>
     Math.random() < missingRate ? '' : value;
 
-  const postingDate = faker.date.between({ from: '2022-01-01', to: '2025-12-31' });
+  const postingDate = seasonalDate();
   const docDate = new Date(postingDate);
   docDate.setDate(docDate.getDate() - faker.number.int({ min: 0, max: 3 })); // Doc date <= posting date
 

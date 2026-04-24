@@ -1,4 +1,5 @@
 const { faker } = require('@faker-js/faker');
+const { seasonalDate } = require('../../utils/dates');
 
 // D365 F&O VendPackingSlipJour — Vendor Packing Slip (Goods Receipt Header)
 // One document per physical goods receipt, linked to PurchTable via PurchId
@@ -34,7 +35,7 @@ function generateVendPackingSlipJourRow(index, options = {}) {
     currencyCode = faker.helpers.arrayElement(['GBP', 'USD', 'EUR', 'INR']);
   }
 
-  const receiptDate = faker.date.between({ from: '2022-01-01', to: '2025-12-31' });
+  const receiptDate = seasonalDate();
   const invoicedAmount = faker.number.float({ min: 100, max: 200000, fractionDigits: 2 });
   const isReversed = Math.random() < 0.04;
 

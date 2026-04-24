@@ -1,4 +1,5 @@
 const { faker } = require('@faker-js/faker');
+const { seasonalDate } = require('../../utils/dates');
 
 // D365 F&O PurchTable — Purchase Order Header
 
@@ -26,7 +27,7 @@ function generatePurchTableRow(index, options = {}) {
   const maybeBlank = (value) =>
     Math.random() < missingRate ? '' : value;
 
-  const purchDate = faker.date.between({ from: '2022-01-01', to: '2025-12-31' });
+  const purchDate = seasonalDate();
   const deliveryDate = new Date(purchDate);
   deliveryDate.setDate(deliveryDate.getDate() + faker.number.int({ min: 7, max: 90 }));
 

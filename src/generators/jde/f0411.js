@@ -1,5 +1,6 @@
 const { faker } = require('@faker-js/faker');
 const { toJulian } = require('./f4301');
+const { seasonalDate, invoicePostingDate } = require('../../utils/dates');
 
 // JDE E1 F0411 — Accounts Payable Ledger (Vendor Invoices)
 // Document type PV = Voucher (standard AP invoice)
@@ -32,9 +33,8 @@ function generateF0411Row(index, options = {}) {
   const maybeBlank = (value) =>
     Math.random() < missingRate ? '' : value;
 
-  const invoiceDate = faker.date.between({ from: '2022-01-01', to: '2025-12-31' });
-  const glDate = new Date(invoiceDate);
-  glDate.setDate(glDate.getDate() + faker.number.int({ min: 0, max: 5 }));
+  const invoiceDate = seasonalDate();
+  const glDate = invoicePostingDate(invoiceDate);
 
   const vend = vendorPool.length > 0
     ? faker.helpers.arrayElement(vendorPool)

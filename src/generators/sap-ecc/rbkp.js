@@ -1,4 +1,5 @@
 const { faker } = require('@faker-js/faker');
+const { seasonalDate, invoicePostingDate } = require('../../utils/dates');
 
 // SAP ECC RBKP — Invoice Document Header (Logistics Invoice Verification)
 // One RBKP per vendor invoice posted in MIRO/MIR7
@@ -24,9 +25,8 @@ function generateRBKPRow(index, options = {}) {
   const maybeBlank = (value) =>
     Math.random() < missingRate ? '' : value;
 
-  const invoiceDate = faker.date.between({ from: '2022-01-01', to: '2025-12-31' });
-  const postingDate = new Date(invoiceDate);
-  postingDate.setDate(postingDate.getDate() + faker.number.int({ min: 0, max: 5 }));
+  const invoiceDate = seasonalDate();
+  const postingDate = invoicePostingDate(invoiceDate);
 
   const baseAmount = faker.number.float({ min: 100, max: 500000, fractionDigits: 2 });
   const taxRate = faker.helpers.arrayElement([0, 0.05, 0.10, 0.20]);

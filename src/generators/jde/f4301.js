@@ -1,4 +1,5 @@
 const { faker } = require('@faker-js/faker');
+const { seasonalDate } = require('../../utils/dates');
 
 // JDE E1 F4301 — Purchase Order Header
 // JDE uses Julian dates: CYYDDD (C=century, YY=year, DDD=day-of-year)
@@ -29,7 +30,7 @@ function generateF4301Row(index, options = {}) {
   const maybeBlank = (value) =>
     Math.random() < missingRate ? '' : value;
 
-  const orderDate = faker.date.between({ from: '2022-01-01', to: '2025-12-31' });
+  const orderDate = seasonalDate();
   const deliveryDate = new Date(orderDate);
   deliveryDate.setDate(deliveryDate.getDate() + faker.number.int({ min: 7, max: 90 }));
 
