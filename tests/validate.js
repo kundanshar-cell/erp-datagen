@@ -579,10 +579,92 @@ test('D365 VendInvoiceJour standalone (no poPool) does not throw', () => {
 
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  SECTION 6: CLI smoke tests
+//  SECTION 6: Vendor tier & behaviour (Priority 6)
 // ═══════════════════════════════════════════════════════════════════════════
 
-section('6. CLI smoke tests');
+const { tagVendorTiers, enrichVendorBehavior, buildWeightedVendorPool } = require('../src/utils/pareto');
+
+section('6. Vendor tiers and behaviour');
+
+test('tagVendorTiers: ~30% of vendors tagged Dormant', () => {
+  const vendors = Array.from({ length: 100 }, (_, i) => ({ LIFNR: String(i + 1) }));
+  const tiered = tagVendorTiers(vendors, 'LIFNR');
+  const dormantCount = tiered.filter(v => v.VENDOR_TIER === 'Dormant').length;
+  // With rounding: 15+25+30=70 active, 30 dormant
+  assert.ok(dormantCount >= 28 && dormantCount <= 32, `Expected ~30 dormant vendors, got ${dormantCount}`);
+});
+
+test('tagVendorTiers: tier proportions roughly match 15/25/30/30 split', () => {
+  const vendors = Array.from({ length: 200 }, (_, i) => ({ LIFNR: String(i + 1) }));
+  const tiered = tagVendorTiers(vendors, 'LIFNR');
+  const counts = { Strategic: 0, Preferred: 0, Tail: 0, Dormant: 0 };
+  tiered.forEach(v => counts[v.VENDOR_TIER]++);
+  assert.ok(counts.Strategic >= 25 && counts.Strategic <= 35, `Strategic: expected ~30 (15%), got ${counts.Strategic}`);
+  assert.ok(counts.Preferred >= 44 && counts.Preferred <= 56, `Preferred: expected ~50 (25%), got ${counts.Preferred}`);
+  assert.ok(counts.Tail >= 54 && counts.Tail <= 66, `Tail: expected ~60 (30%), got ${counts.Tail}`);
+  assert.ok(counts.Dormant >= 54 && counts.Dormant <= 66, `Dormant: expected ~60 (30%), got ${counts.Dormant}`);
+});
+
+test('enrichVendorBehavior: all rows have PAYMENT_BEHAVIOR and IS_SINGLE_SOURCE', () => {
+  const vendors = Array.from({ length: 50 }, (_, i) => ({ LIFNR: String(i + 1) }));
+  const enriched = enrichVendorBehavior(tagVendorTiers(vendors, 'LIFNR'));
+  enriched.forEach((v, i) => {
+    assert.ok(['Reliable','Moderate','HighRisk'].includes(v.PAYMENT_BEHAVIOR),
+      `Row ${i}: unexpected PAYMENT_BEHAVIOR "${v.PAYMENT_BEHAVIOR}"`);
+    assert.ok(typeof v.IS_SINGLE_SOURCE === 'boolean', `Row ${i}: IS_SINGLE_SOURCE should be boolean`);
+  });
+});
+
+test('enrichVendorBehavior: Strategic vendors are Reliable >80% of the time', () => {
+  const vendors = Array.from({ length: 500 }, (_, i) => ({ LIFNR: String(i + 1) }));
+  const enriched = enrichVendorBehavior(tagVendorTiers(vendors, 'LIFNR'));
+  const strategic = enriched.filter(v => v.VENDOR_TIER === 'Strategic');
+  const reliableRate = strategic.filter(v => v.PAYMENT_BEHAVIOR === 'Reliable').length / strategic.length;
+  assert.ok(reliableRate > 0.80, `Strategic reliable rate ${(reliableRate*100).toFixed(1)}% should be >80%`);
+});
+
+test('enrichVendorBehavior: Dormant vendors have no Reliable payment behaviour', () => {
+  const vendors = Array.from({ length: 500 }, (_, i) => ({ LIFNR: String(i + 1) }));
+  const enriched = enrichVendorBehavior(tagVendorTiers(vendors, 'LIFNR'));
+  const dormant = enriched.filter(v => v.VENDOR_TIER === 'Dormant');
+  const hasReliable = dormant.some(v => v.PAYMENT_BEHAVIOR === 'Reliable');
+  assert.ok(!hasReliable, 'Dormant vendors should never be Reliable');
+});
+
+test('SAP scenario: 0% of POs go to Dormant vendors', () => {
+  const result = runFullP2P(100);
+  const dormantIds = new Set(result.lfa1.filter(v => v.VENDOR_TIER === 'Dormant').map(v => v.LIFNR));
+  const dormantPOs = result.ekko.filter(h => dormantIds.has(h.LIFNR));
+  assert.equal(dormantPOs.length, 0, `${dormantPOs.length} POs assigned to Dormant vendors (should be 0)`);
+});
+
+test('JDE scenario: 0% of POs go to Dormant vendors', () => {
+  const result = runJdeFullP2P(100);
+  const dormantIds = new Set(result.f0101.filter(v => v.VENDOR_TIER === 'Dormant').map(v => v.AN8));
+  const dormantPOs = result.f4301.filter(h => dormantIds.has(h.VEND));
+  assert.equal(dormantPOs.length, 0, `${dormantPOs.length} JDE POs assigned to Dormant vendors`);
+});
+
+test('D365 scenario: 0% of POs go to Dormant vendors', () => {
+  const result = runD365FullP2P(100);
+  const dormantIds = new Set(result.vendTable.filter(v => v.VENDOR_TIER === 'Dormant').map(v => v.AccountNum));
+  const dormantPOs = result.purchTable.filter(h => dormantIds.has(h.OrderAccount));
+  assert.equal(dormantPOs.length, 0, `${dormantPOs.length} D365 POs assigned to Dormant vendors`);
+});
+
+test('SAP scenario: vendor master has PAYMENT_BEHAVIOR on all rows', () => {
+  const result = runFullP2P(50);
+  result.lfa1.forEach((v, i) => {
+    assert.ok(['Reliable','Moderate','HighRisk'].includes(v.PAYMENT_BEHAVIOR),
+      `LFA1 row ${i}: missing/invalid PAYMENT_BEHAVIOR`);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SECTION 7: CLI smoke tests
+// ═══════════════════════════════════════════════════════════════════════════
+
+section('7. CLI smoke tests');
 
 const ROOT = path.resolve(__dirname, '..');
 

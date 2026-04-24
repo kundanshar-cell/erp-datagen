@@ -4,7 +4,7 @@ const { generateF4301 } = require('../generators/jde/f4301');
 const { generateF4311 } = require('../generators/jde/f4311');
 const { generateF43121 } = require('../generators/jde/f43121');
 const { generateF0411 } = require('../generators/jde/f0411');
-const { buildWeightedVendorPool, tagVendorTiers } = require('../utils/pareto');
+const { buildWeightedVendorPool, tagVendorTiers, enrichVendorBehavior } = require('../utils/pareto');
 
 // Full P2P scenario for JDE E1
 // Generates all 5 tables linked by real keys:
@@ -18,10 +18,11 @@ function runJdeFullP2P(rows, options = {}) {
 
   // --- Step 1: Vendors (F0101) ---
   const vendorCount = Math.max(10, Math.floor(rows * 0.1));
-  const f0101 = tagVendorTiers(generateF0101(vendorCount, { missingRate }), 'AN8');
-  const vendorPool = f0101.map(v => v.AN8);
+  const f0101 = enrichVendorBehavior(tagVendorTiers(generateF0101(vendorCount, { missingRate }), 'AN8'));
+  // Dormant vendors: appear in master data but receive NO POs (contract expired / deactivated)
+  const activeVendorIds = f0101.filter(v => v.VENDOR_TIER !== 'Dormant').map(v => v.AN8);
   // Weighted pool: strategic vendors (top 20%) get 80% of PO assignments — Pareto distribution
-  const weightedVendorPool = buildWeightedVendorPool(vendorPool);
+  const weightedVendorPool = buildWeightedVendorPool(activeVendorIds);
 
   // --- Step 2: PO Headers (F4301) linked to vendors ---
   const poHeaderCount = Math.max(5, Math.floor(rows * 0.2));

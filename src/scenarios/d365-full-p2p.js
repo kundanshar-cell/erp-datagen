@@ -1,5 +1,5 @@
 const { faker } = require('@faker-js/faker');
-const { buildWeightedVendorPool, tagVendorTiers } = require('../utils/pareto');
+const { buildWeightedVendorPool, tagVendorTiers, enrichVendorBehavior } = require('../utils/pareto');
 const { generateVendTable }           = require('../generators/d365/vendtable');
 const { generatePurchTable }          = require('../generators/d365/purchtable');
 const { generatePurchLine }           = require('../generators/d365/purchline');
@@ -21,10 +21,11 @@ function runD365FullP2P(rows, options = {}) {
 
   // --- Step 1: Vendors (VendTable) ---
   const vendorCount = Math.max(10, Math.floor(rows * 0.1));
-  const vendTable = tagVendorTiers(generateVendTable(vendorCount, { missingRate }), 'AccountNum');
-  const vendorPool = vendTable.map(v => v.AccountNum);
+  const vendTable = enrichVendorBehavior(tagVendorTiers(generateVendTable(vendorCount, { missingRate }), 'AccountNum'));
+  // Dormant vendors: appear in master data but receive NO POs (contract expired / deactivated)
+  const activeVendorIds = vendTable.filter(v => v.VENDOR_TIER !== 'Dormant').map(v => v.AccountNum);
   // Weighted pool: strategic vendors (top 20%) get 80% of PO assignments — Pareto distribution
-  const weightedVendorPool = buildWeightedVendorPool(vendorPool);
+  const weightedVendorPool = buildWeightedVendorPool(activeVendorIds);
 
   // --- Step 2: PO Headers (PurchTable) linked to vendors ---
   const poHeaderCount = Math.max(5, Math.floor(rows * 0.2));

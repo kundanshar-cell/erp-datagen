@@ -6,7 +6,7 @@ const { generateMKPF } = require('../generators/sap-ecc/mkpf');
 const { generateMSEG } = require('../generators/sap-ecc/mseg');
 const { generateRBKP } = require('../generators/sap-ecc/rbkp');
 const { generateRSEG } = require('../generators/sap-ecc/rseg');
-const { buildWeightedVendorPool, tagVendorTiers } = require('../utils/pareto');
+const { buildWeightedVendorPool, tagVendorTiers, enrichVendorBehavior } = require('../utils/pareto');
 
 // Full P2P scenario for SAP ECC
 // Generates all 7 tables linked by real keys:
@@ -18,10 +18,11 @@ function runFullP2P(rows, options = {}) {
 
   // --- Step 1: Vendors (LFA1) ---
   const vendorCount = Math.max(10, Math.floor(rows * 0.1));
-  const lfa1 = tagVendorTiers(generateLFA1(vendorCount, { missingRate }), 'LIFNR');
-  const vendorPool = lfa1.map(v => v.LIFNR);
+  const lfa1 = enrichVendorBehavior(tagVendorTiers(generateLFA1(vendorCount, { missingRate }), 'LIFNR'));
+  // Dormant vendors: appear in master data but receive NO POs (contract expired / deactivated)
+  const activeVendorIds = lfa1.filter(v => v.VENDOR_TIER !== 'Dormant').map(v => v.LIFNR);
   // Weighted pool: strategic vendors (top 20%) get 80% of PO assignments — Pareto distribution
-  const weightedVendorPool = buildWeightedVendorPool(vendorPool);
+  const weightedVendorPool = buildWeightedVendorPool(activeVendorIds);
 
   // --- Step 2: PO Headers (EKKO) linked to vendors ---
   const poHeaderCount = Math.max(5, Math.floor(rows * 0.2));
